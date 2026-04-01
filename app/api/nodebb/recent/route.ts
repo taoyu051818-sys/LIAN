@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server"
 import { spawn } from "node:child_process"
+import { existsSync } from "node:fs"
 
 const NODEBB_URL =
   process.env.NODEBB_INTERNAL_URL ||
   process.env.NEXT_PUBLIC_NODEBB_URL ||
   "http://localhost:4567"
-const nodebbRoot = process.env.NODEBB_INTERNAL_ROOT || "/home/ty/NodeBB"
-const scriptPath = `${nodebbRoot}/scripts/get_frontend_anonymous_topics.js`
+const nodebbRoot = process.env.NODEBB_INTERNAL_ROOT
+const scriptPath = nodebbRoot ? `${nodebbRoot}/scripts/get_frontend_anonymous_topics.js` : null
 
 type AnonymousMapResponse = {
   map?: Record<string, boolean>
 }
 
 async function getAnonymousMap(tids: string[]) {
-  if (!tids.length) {
+  if (!tids.length || !nodebbRoot || !scriptPath || !existsSync(scriptPath)) {
     return {}
   }
 
@@ -75,7 +76,12 @@ export async function GET() {
     const data = await response.json()
     const topics = Array.isArray(data.topics) ? data.topics : []
     const tids = topics.map((topic: { tid?: number | string }) => String(topic.tid || "")).filter(Boolean)
-    const anonymousMap = await getAnonymousMap(tids)
+    let anonymousMap: Record<string, boolean> = {}
+    try {
+      anonymousMap = await getAnonymousMap(tids)
+    } catch {
+      anonymousMap = {}
+    }
 
     data.topics = topics.map((topic: { tid?: number | string }) => ({
       ...topic,

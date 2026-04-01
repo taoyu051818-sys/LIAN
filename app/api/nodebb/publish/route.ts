@@ -1,13 +1,25 @@
 import { spawn } from "node:child_process"
 import { NextResponse } from "next/server"
+import { existsSync } from "node:fs"
 
-const nodebbRoot = process.env.NODEBB_INTERNAL_ROOT || "/home/ty/NodeBB"
-const scriptPath = `${nodebbRoot}/scripts/create_topic_from_frontend.js`
+const nodebbRoot = process.env.NODEBB_INTERNAL_ROOT
+const scriptPath = nodebbRoot ? `${nodebbRoot}/scripts/create_topic_from_frontend.js` : null
 
 export const runtime = "nodejs"
 
 export async function POST(request: Request) {
   try {
+    if (!nodebbRoot || !scriptPath || !existsSync(scriptPath)) {
+      return NextResponse.json(
+        {
+          error: "Publish script unavailable",
+          details:
+            "NODEBB_INTERNAL_ROOT is required and must contain scripts/create_topic_from_frontend.js",
+        },
+        { status: 503 }
+      )
+    }
+
     const payload = await request.json()
     const stdout = await new Promise<string>((resolve, reject) => {
       const child = spawn(process.execPath, [scriptPath], {

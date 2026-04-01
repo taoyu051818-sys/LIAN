@@ -1,18 +1,23 @@
 import { NextResponse } from "next/server"
 import { spawn } from "node:child_process"
+import { existsSync } from "node:fs"
 
 const NODEBB_URL =
   process.env.NODEBB_INTERNAL_URL ||
   process.env.NEXT_PUBLIC_NODEBB_URL ||
   "http://localhost:4567"
-const nodebbRoot = process.env.NODEBB_INTERNAL_ROOT || "/home/ty/NodeBB"
-const scriptPath = `${nodebbRoot}/scripts/get_frontend_anonymous_topics.js`
+const nodebbRoot = process.env.NODEBB_INTERNAL_ROOT
+const scriptPath = nodebbRoot ? `${nodebbRoot}/scripts/get_frontend_anonymous_topics.js` : null
 
 type AnonymousMapResponse = {
   map?: Record<string, boolean>
 }
 
 async function getAnonymousFlag(tid: string) {
+  if (!nodebbRoot || !scriptPath || !existsSync(scriptPath)) {
+    return false
+  }
+
   const stdout = await new Promise<string>((resolve, reject) => {
     const child = spawn(process.execPath, [scriptPath], {
       cwd: nodebbRoot,
@@ -74,7 +79,11 @@ export async function GET(
     }
 
     const data = await response.json()
-    data.frontendAnonymous = await getAnonymousFlag(String(tid))
+    try {
+      data.frontendAnonymous = await getAnonymousFlag(String(tid))
+    } catch {
+      data.frontendAnonymous = false
+    }
     return NextResponse.json(data)
   } catch (error) {
     return NextResponse.json(
