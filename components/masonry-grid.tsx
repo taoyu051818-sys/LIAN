@@ -6,9 +6,10 @@ import { PostCard, type PostData } from "./post-card"
 interface MasonryGridProps {
   posts: PostData[]
   onPostClick?: (id: string) => void
+  onPostLike?: (post: PostData, nextLiked: boolean) => Promise<boolean | void> | boolean | void
 }
 
-export function MasonryGrid({ posts, onPostClick }: MasonryGridProps) {
+export function MasonryGrid({ posts, onPostClick, onPostLike }: MasonryGridProps) {
   // 使用 useMemo 确保列分配在客户端和服务端一致
   const columnPosts = useMemo(() => {
     const columns: PostData[][] = [[], []]
@@ -29,6 +30,7 @@ export function MasonryGrid({ posts, onPostClick }: MasonryGridProps) {
             <PostCard 
               key={post.id} 
               post={post} 
+              onLike={onPostLike}
               onClick={onPostClick} 
               isFirst={postIndex === 0}
             />

@@ -1,6 +1,6 @@
 "use client"
 
-import { Heart, MessageCircle, Bookmark } from "lucide-react"
+import { Heart } from "lucide-react"
 import Image from "next/image"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
@@ -16,37 +16,47 @@ export interface PostData {
     school: string
     isAnonymous: boolean
   }
-  tags: string[]
+  tags: Array<string | { value?: string }>
   likes: number
   comments: number
+  participantCount?: number
   isLiked?: boolean
   isBookmarked?: boolean
 }
 
 interface PostCardProps {
   post: PostData
-  onLike?: (id: string) => void
-  onBookmark?: (id: string) => void
+  onLike?: (post: PostData, nextLiked: boolean) => Promise<boolean | void> | boolean | void
   onClick?: (id: string) => void
   isFirst?: boolean
 }
 
-export function PostCard({ post, onLike, onBookmark, onClick, isFirst }: PostCardProps) {
+export function PostCard({ post, onLike, onClick, isFirst }: PostCardProps) {
   const [isLiked, setIsLiked] = useState(post.isLiked || false)
   const [likes, setLikes] = useState(post.likes)
-  const [isBookmarked, setIsBookmarked] = useState(post.isBookmarked || false)
+  const safeTags = (post.tags || [])
+    .map((tag) => (typeof tag === "string" ? tag : tag?.value || ""))
+    .map((tag) => String(tag).trim())
+    .filter(Boolean)
 
-  const handleLike = (e: React.MouseEvent) => {
+  const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    setIsLiked(!isLiked)
-    setLikes(isLiked ? likes - 1 : likes + 1)
-    onLike?.(post.id)
-  }
+    const nextLiked = !isLiked
+    const prevLiked = isLiked
+    const prevLikes = likes
 
-  const handleBookmark = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setIsBookmarked(!isBookmarked)
-    onBookmark?.(post.id)
+    setIsLiked(nextLiked)
+    setLikes((value) => Math.max(0, value + (nextLiked ? 1 : -1)))
+
+    try {
+      const result = await onLike?.(post, nextLiked)
+      if (result === false) {
+        throw new Error("like failed")
+      }
+    } catch {
+      setIsLiked(prevLiked)
+      setLikes(prevLikes)
+    }
   }
 
   return (
@@ -65,9 +75,9 @@ export function PostCard({ post, onLike, onBookmark, onClick, isFirst }: PostCar
         />
         {/* 标签悬浮 */}
         <div className="absolute bottom-2 left-2 flex flex-wrap gap-1">
-          {post.tags.slice(0, 2).map((tag) => (
+          {safeTags.slice(0, 2).map((tag, index) => (
             <span
-              key={tag}
+              key={`${tag}-${index}`}
               className="px-2 py-0.5 bg-background/80 backdrop-blur-sm text-xs rounded-full text-foreground/80"
             >
               #{tag}
@@ -122,17 +132,6 @@ export function PostCard({ post, onLike, onBookmark, onClick, isFirst }: PostCar
                 )}
               />
               <span className="text-xs">{likes}</span>
-            </button>
-            <button
-              onClick={handleBookmark}
-              className="text-muted-foreground hover:text-accent transition-colors"
-            >
-              <Bookmark
-                className={cn(
-                  "w-4 h-4 transition-all",
-                  isBookmarked && "fill-accent text-accent"
-                )}
-              />
             </button>
           </div>
         </div>

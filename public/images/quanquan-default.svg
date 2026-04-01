@@ -1,0 +1,23 @@
+<svg width="800" height="1000" viewBox="0 0 800 1000" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="800" y2="1000" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5F7FA"/>
+      <stop offset="1" stop-color="#E8EEF6"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="260" y1="210" x2="540" y2="490" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F8CFF"/>
+      <stop offset="1" stop-color="#6F5DFF"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="1000" fill="url(#bg)"/>
+
+  <circle cx="400" cy="350" r="150" fill="#FFFFFF"/>
+  <circle cx="400" cy="350" r="122" stroke="url(#ring)" stroke-width="34"/>
+  <circle cx="400" cy="350" r="60" fill="#EEF4FF"/>
+
+  <rect x="190" y="590" width="420" height="26" rx="13" fill="#B8C9E8"/>
+  <rect x="260" y="640" width="280" height="22" rx="11" fill="#C8D5EC"/>
+
+  <text x="400" y="740" text-anchor="middle" fill="#5B6D88" font-size="56" font-family="Arial, sans-serif" font-weight="700">圈圈</text>
+</svg>

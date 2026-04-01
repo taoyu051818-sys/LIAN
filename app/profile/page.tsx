@@ -1,150 +1,196 @@
 "use client"
 
-import { LogOut, Settings, Heart, Bookmark, Award } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import Image from "next/image"
+import { useEffect, useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
+import { BadgeCheck, Bookmark, Heart, LogOut, Settings } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { BottomNav } from "@/components/bottom-nav"
 
-export default function ProfilePage() {
-  const userProfile = {
-    name: "李明",
-    school: "北京大学",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
-    bio: "喜欢打球，爱好摄影，一直在寻找志同道合的小伙伴",
-    joinDate: "加入于2个月前",
-    stats: {
-      posts: 12,
-      followers: 342,
-      following: 89,
-    },
+type ProfilePayload = {
+  user: {
+    uid: number
+    username: string
+    userslug: string
+    displayname?: string
+    picture?: string | null
+    reputation?: number
+    topiccount?: number
+    postcount?: number
+    joindateISO?: string
+  } | null
+  profile?: {
+    aboutme?: string
   }
+  bookmarks?: Array<unknown>
+  upvoted?: Array<unknown>
+}
+
+export default function ProfilePage() {
+  const [data, setData] = useState<ProfilePayload | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    let active = true
+
+    async function loadProfile() {
+      try {
+        setLoading(true)
+        setError("")
+        const response = await fetch("/api/nodebb/profile", { cache: "no-store" })
+        if (response.status === 401) {
+          window.location.href = "/auth"
+          return
+        }
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+
+        const payload = (await response.json()) as ProfilePayload
+        if (active) {
+          setData(payload)
+        }
+      } catch (err) {
+        if (active) {
+          setError(err instanceof Error ? err.message : "Failed to load profile")
+        }
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadProfile()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const handleLogout = async () => {
+    await fetch("/api/nodebb/auth/logout", { method: "POST" }).catch(() => undefined)
+    window.location.href = "/"
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <div className="px-4 py-10 text-center text-sm text-muted-foreground">Loading profile...</div>
+        <BottomNav />
+      </div>
+    )
+  }
+
+  if (error || !data?.user) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <div className="px-4 py-10 text-center text-sm text-destructive">{error || "Not logged in"}</div>
+        <BottomNav />
+      </div>
+    )
+  }
+
+  const user = data.user
+  const displayName = user.displayname || user.username
+  const avatar =
+    user.picture ||
+    `https://placehold.co/200x200/f4f4f5/27272a?text=${encodeURIComponent(displayName[0] || "?")}`
+  const joinDate = user.joindateISO ? new Date(user.joindateISO).toLocaleDateString("zh-CN") : "Unknown"
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* 顶部导航 */}
-      <header className="sticky top-0 z-40 bg-background border-b border-border">
-        <div className="h-12 px-4 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-foreground">我的</h1>
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <Settings className="w-5 h-5" />
-          </Button>
+      <header className="sticky top-0 z-40 border-b border-border bg-background">
+        <div className="flex h-12 items-center justify-between px-4">
+          <h1 className="text-lg font-bold text-foreground">My Profile</h1>
+          <Link href="/profile/edit">
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <Settings className="h-5 w-5" />
+            </Button>
+          </Link>
         </div>
       </header>
 
-      {/* 个人信息卡 */}
-      <div className="px-4 py-6 space-y-4">
-        {/* 头像和基本信息 */}
+      <div className="space-y-4 px-4 py-6">
         <div className="flex gap-4">
-          <div className="relative w-16 h-16 rounded-full overflow-hidden bg-muted flex-shrink-0">
-            <Image
-              src={userProfile.avatar}
-              alt={userProfile.name}
-              fill
-              className="object-cover"
-            />
+          <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-full bg-muted">
+            <Image src={avatar} alt={displayName} fill className="object-cover" />
           </div>
-          <div className="flex-1 flex flex-col justify-center">
-            <h2 className="text-lg font-bold text-foreground">{userProfile.name}</h2>
-            <p className="text-sm text-muted-foreground">{userProfile.school}</p>
-            <p className="text-xs text-muted-foreground mt-1">{userProfile.joinDate}</p>
+          <div className="flex flex-1 flex-col justify-center">
+            <h2 className="text-lg font-bold text-foreground">{displayName}</h2>
+            <p className="text-sm text-muted-foreground">@{user.userslug}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Joined {joinDate}</p>
           </div>
         </div>
 
-        {/* 签名 */}
-        <p className="text-sm text-foreground leading-relaxed">{userProfile.bio}</p>
+        <p className="text-sm leading-relaxed text-foreground">
+          {data.profile?.aboutme || "No profile introduction yet."}
+        </p>
 
-        {/* 统计数据 */}
-        <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border">
-          <div className="text-center py-2">
-            <p className="text-lg font-bold text-foreground">{userProfile.stats.posts}</p>
-            <p className="text-xs text-muted-foreground">发布</p>
+        <div className="grid grid-cols-3 gap-3 border-t border-border pt-3">
+          <div className="py-2 text-center">
+            <p className="text-lg font-bold text-foreground">{user.topiccount || 0}</p>
+            <p className="text-xs text-muted-foreground">Topics</p>
           </div>
-          <div className="text-center py-2">
-            <p className="text-lg font-bold text-foreground">{userProfile.stats.followers}</p>
-            <p className="text-xs text-muted-foreground">粉丝</p>
+          <div className="py-2 text-center">
+            <p className="text-lg font-bold text-foreground">{user.postcount || 0}</p>
+            <p className="text-xs text-muted-foreground">Posts</p>
           </div>
-          <div className="text-center py-2">
-            <p className="text-lg font-bold text-foreground">{userProfile.stats.following}</p>
-            <p className="text-xs text-muted-foreground">关注</p>
+          <div className="py-2 text-center">
+            <p className="text-lg font-bold text-foreground">{user.reputation || 0}</p>
+            <p className="text-xs text-muted-foreground">Reputation</p>
           </div>
         </div>
 
-        {/* 编辑按钮 */}
-        <Button variant="outline" className="w-full h-10 rounded-lg">
-          编辑个人资料
-        </Button>
       </div>
 
-      {/* 功能菜单 */}
-      <div className="px-4 py-4 space-y-2 border-t border-border">
+      <div className="space-y-2 border-t border-border px-4 py-4">
         <Link
-          href="#"
-          className="flex items-center justify-between px-4 py-3 rounded-lg hover:bg-muted transition-colors"
+          href="/profile/likes"
+          className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/40"
         >
           <div className="flex items-center gap-3">
-            <Heart className="w-5 h-5 text-muted-foreground" />
-            <span className="text-sm text-foreground">我的赞</span>
+            <Heart className="h-5 w-5 text-muted-foreground" />
+            <span className="text-sm text-foreground">My likes</span>
           </div>
-          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">{data.upvoted?.length || 0}</span>
         </Link>
 
         <Link
-          href="#"
-          className="flex items-center justify-between px-4 py-3 rounded-lg hover:bg-muted transition-colors"
+          href="/profile/bookmarks"
+          className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/40"
         >
           <div className="flex items-center gap-3">
-            <Bookmark className="w-5 h-5 text-muted-foreground" />
-            <span className="text-sm text-foreground">我的收藏</span>
+            <Bookmark className="h-5 w-5 text-muted-foreground" />
+            <span className="text-sm text-foreground">My bookmarks</span>
           </div>
-          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">{data.bookmarks?.length || 0}</span>
         </Link>
 
         <Link
-          href="#"
-          className="flex items-center justify-between px-4 py-3 rounded-lg hover:bg-muted transition-colors"
+          href="/profile/verify"
+          className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/40"
         >
           <div className="flex items-center gap-3">
-            <Award className="w-5 h-5 text-muted-foreground" />
-            <span className="text-sm text-foreground">我的成就</span>
+            <BadgeCheck className="h-5 w-5 text-muted-foreground" />
+            <span className="text-sm text-foreground">验证高校身份</span>
           </div>
-          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">去验证</span>
         </Link>
       </div>
 
-      {/* 底部退出登录 */}
-      <div className="px-4 mt-8">
+      <div className="mt-8 px-4">
         <Button
           variant="outline"
-          className="w-full h-10 rounded-lg text-destructive border-destructive/20 hover:bg-destructive/5"
+          className="h-10 w-full rounded-lg border-destructive/20 text-destructive hover:bg-destructive/5"
+          onClick={handleLogout}
         >
-          <LogOut className="w-4 h-4 mr-2" />
-          退出登录
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
         </Button>
       </div>
 
       <BottomNav />
     </div>
-  )
-}
-
-interface ChevronRightProps {
-  className?: string
-}
-
-function ChevronRight({ className }: ChevronRightProps) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <polyline points="9 18 15 12 9 6"></polyline>
-    </svg>
   )
 }
