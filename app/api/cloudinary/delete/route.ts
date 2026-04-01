@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
-import { cloudinary } from "@/lib/cloudinary"
+import { getCloudinary } from "@/lib/cloudinary"
 
 export const runtime = "nodejs"
 
 export async function POST(request: Request) {
   try {
+    const cloudinary = getCloudinary()
     const { publicId } = await request.json()
 
     if (!publicId || typeof publicId !== "string") {
