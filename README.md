@@ -2,6 +2,24 @@
 
 This frontend integrates with a NodeBB backend through `app/api/nodebb/*` routes.
 
+## Local-first debugging
+
+When debugging frontend issues on this workstation, check the local WSL frontend first.
+
+- Local frontend URL: `http://localhost:3000`
+- Local NodeBB URL: `http://localhost:4567`
+- Local NodeBB root: `/home/ty/NodeBB`
+
+Use these scripts:
+
+```bat
+start-frontend.bat
+stop-frontend.bat
+```
+
+Detailed local startup notes live in `LOCAL_DEBUGGING.md`.
+`start-frontend.bat` starts the local WSL frontend in a production-like mode and builds first when needed.
+
 ## NodeBB script sync (required on server)
 
 Some API routes call helper scripts from the NodeBB server filesystem:

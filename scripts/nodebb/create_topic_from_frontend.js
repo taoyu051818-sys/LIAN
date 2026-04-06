@@ -1,9 +1,16 @@
 #!/usr/bin/env node
 "use strict";
 
-const fs = require("fs");
 const path = require("path");
-const { createClient } = require("redis");
+
+const rootDir = process.cwd();
+const configPath = path.join(rootDir, "config.json");
+process.env.CONFIG = configPath;
+require(path.join(rootDir, "require-main"));
+
+const db = require(path.join(rootDir, "src/database"));
+const meta = require(path.join(rootDir, "src/meta"));
+const Topics = require(path.join(rootDir, "src/topics"));
 
 async function readStdinJson() {
   const input = await new Promise((resolve) => {
@@ -24,18 +31,6 @@ function required(v) {
 }
 
 async function main() {
-  const configPath = path.join(process.cwd(), "config.json");
-  const rawConfig = fs.readFileSync(configPath, "utf8");
-  const config = JSON.parse(rawConfig);
-
-  const redisCfg = config.redis || {};
-  const host = redisCfg.host || "127.0.0.1";
-  const port = Number(redisCfg.port || 6379);
-  const password = redisCfg.password || undefined;
-  const database = Number(
-    redisCfg.database !== undefined ? redisCfg.database : 0
-  );
-
   const payload = await readStdinJson();
   const title = String(payload.title || "").trim();
   const content = String(payload.content || payload.body || "").trim();
@@ -48,71 +43,35 @@ async function main() {
     process.exit(1);
   }
 
-  const client = createClient({
-    socket: { host, port },
-    password,
-    database,
-  });
-
-  await client.connect();
+  await db.init();
+  await meta.configs.init();
 
   try {
-    const tid = Number(await client.incr("global:nextTid"));
-    const pid = Number(await client.incr("global:nextPid"));
-    const now = Date.now();
-    const slugPart =
-      title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "") || "topic";
-
-    await client.hSet(`topic:${tid}`, {
-      tid: String(tid),
-      uid: String(uid),
-      cid: String(cid),
+    const result = await Topics.post({
+      uid,
+      cid,
       title,
-      slug: `${tid}/${slugPart}`,
-      timestamp: String(now),
-      lastposttime: String(now),
-      postcount: "1",
-      viewcount: "0",
-      postercount: "1",
-      followercount: "1",
-      mainPid: String(pid),
-      deleted: "0",
-      locked: "0",
-      pinned: "0",
-      upvotes: "0",
-      downvotes: "0",
-      frontendAnonymous: frontendAnonymous ? "1" : "0",
-    });
-
-    await client.hSet(`post:${pid}`, {
-      pid: String(pid),
-      tid: String(tid),
-      uid: String(uid),
       content,
-      timestamp: String(now),
-      edited: "0",
-      deleted: "0",
-      upvotes: "0",
-      downvotes: "0",
-      votes: "0",
     });
 
-    await client.zAdd("topics:tid", [{ score: tid, value: String(tid) }]);
-    await client.zAdd("topics:recent", [{ score: now, value: String(tid) }]);
-    await client.zAdd(`cid:${cid}:tids`, [{ score: now, value: String(tid) }]);
-    await client.zAdd(`cid:${cid}:tids:posts`, [{ score: now, value: String(tid) }]);
-    await client.zAdd(`tid:${tid}:posts`, [{ score: now, value: String(pid) }]);
+    const tid = Number(result?.topicData?.tid || 0);
+    const pid = Number(result?.postData?.pid || result?.topicData?.mainPid || 0);
 
-    await client.hIncrBy(`user:${uid}`, "topiccount", 1);
-    await client.hIncrBy(`user:${uid}`, "postcount", 1);
-    await client.hSet(`user:${uid}`, { lastposttime: String(now) });
+    if (!tid || !pid) {
+      throw new Error("Topic creation returned incomplete data");
+    }
+
+    if (frontendAnonymous) {
+      await db.setObjectField(`topic:${tid}`, "frontendAnonymous", "1");
+    }
 
     console.log(JSON.stringify({ ok: true, tid, pid }));
   } finally {
-    await client.quit();
+    if (typeof db.close === "function") {
+      await db.close();
+    } else if (typeof db.closeConnection === "function") {
+      await db.closeConnection();
+    }
   }
 }
 
