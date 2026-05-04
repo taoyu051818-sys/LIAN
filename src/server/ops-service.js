@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,7 +10,19 @@ import { securityModeName } from "./security-mode.js";
 
 const DEFAULT_PUBLIC_BASE_URL = "https://lian.nat100.top";
 const REQUEST_TIMEOUT_MS = 8000;
+const OPS_LOG_DIR = process.env.LIAN_OPS_LOG_DIR || "/tmp";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const backendRepoDir = process.env.LIAN_BACKEND_REPO_DIR || repoRoot;
+const frontendRepoDir = process.env.LIAN_FRONTEND_REPO_DIR || "/opt/lian-mobile-web";
+
+const OPS_ACTIONS = new Set([
+  "restart-frontend",
+  "restart-backend",
+  "restart-all",
+  "update-frontend",
+  "update-backend",
+  "update-all"
+]);
 
 function normalizeBaseUrl(value = "") {
   const raw = String(value || "").trim() || DEFAULT_PUBLIC_BASE_URL;
@@ -19,6 +32,10 @@ function normalizeBaseUrl(value = "") {
   url.search = "";
   url.hash = "";
   return url.toString().replace(/\/$/, "");
+}
+
+function shellQuote(value = "") {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
 
 async function fetchText(url, { method = "GET" } = {}) {
@@ -92,6 +109,92 @@ async function readGitInfo() {
   }
 }
 
+function frontendRestartScript() {
+  return `
+cd ${shellQuote(frontendRepoDir)}
+pkill -f serve-frontend-static-rehearsal.js || true
+nohup npm run start:frontend-static > /tmp/lian-frontend-static.log 2>&1 &
+sleep 1
+cat /tmp/lian-frontend-static.log || true
+`;
+}
+
+function backendRestartScript() {
+  return `
+cd ${shellQuote(backendRepoDir)}
+lsof -t -iTCP:${Number(config.port)} -sTCP:LISTEN -n -P | xargs -r kill -9 || true
+lsof -t -iTCP:${Number(config.imageProxyPort)} -sTCP:LISTEN -n -P | xargs -r kill -9 || true
+sleep 1
+nohup npm start > /tmp/lian-platform-server.log 2>&1 &
+sleep 1
+cat /tmp/lian-platform-server.log || true
+`;
+}
+
+function frontendUpdateScript() {
+  return `
+cd ${shellQuote(frontendRepoDir)}
+git fetch origin
+git checkout main
+git pull --ff-only origin main
+${frontendRestartScript()}
+`;
+}
+
+function backendUpdateScript() {
+  return `
+cd ${shellQuote(backendRepoDir)}
+git fetch origin
+git checkout main
+git pull --ff-only origin main
+${backendRestartScript()}
+`;
+}
+
+function scriptForAction(action) {
+  switch (action) {
+    case "restart-frontend":
+      return frontendRestartScript();
+    case "restart-backend":
+      return backendRestartScript();
+    case "restart-all":
+      return `${frontendRestartScript()}\n${backendRestartScript()}`;
+    case "update-frontend":
+      return frontendUpdateScript();
+    case "update-backend":
+      return backendUpdateScript();
+    case "update-all":
+      return `${frontendUpdateScript()}\n${backendUpdateScript()}`;
+    default:
+      return "";
+  }
+}
+
+function scheduleOpsAction(action) {
+  if (!OPS_ACTIONS.has(action)) {
+    const error = new Error("unsupported ops action");
+    error.status = 400;
+    throw error;
+  }
+  const logPath = path.join(OPS_LOG_DIR, `lian-ops-${action}-${Date.now()}.log`);
+  const script = `
+set -euo pipefail
+{
+  echo "[LIAN ops] action=${action}"
+  echo "[LIAN ops] started_at=$(date -Iseconds)"
+  sleep 1
+  ${scriptForAction(action)}
+  echo "[LIAN ops] finished_at=$(date -Iseconds)"
+} > ${shellQuote(logPath)} 2>&1
+`;
+  const child = spawn("/bin/bash", ["-lc", script], {
+    detached: true,
+    stdio: "ignore"
+  });
+  child.unref();
+  return { action, pid: child.pid, logPath };
+}
+
 async function handleOpsHealth(req, reqUrl, res) {
   requireAdmin(req);
 
@@ -155,10 +258,27 @@ async function handleOpsHealth(req, reqUrl, res) {
       setupRequired: isSetupRequired(),
       securityMode: securityModeName(),
       cloudinaryConfigured: Boolean(config.cloudinaryUrl),
-      mailConfigured: Boolean(config.resendApiKey || config.smtpHost)
+      mailConfigured: Boolean(config.resendApiKey || config.smtpHost),
+      backendRepoDir,
+      frontendRepoDir
     },
     checks
   });
 }
 
-export { handleOpsHealth };
+async function handleOpsAction(req, reqUrl, res) {
+  requireAdmin(req);
+  if (req.method !== "POST") {
+    return sendJson(res, 405, { error: "method not allowed" });
+  }
+  const action = String(reqUrl.searchParams.get("action") || "").trim();
+  const scheduled = scheduleOpsAction(action);
+  sendJson(res, 202, {
+    ok: true,
+    scheduledAt: new Date().toISOString(),
+    message: "ops action scheduled",
+    ...scheduled
+  });
+}
+
+export { handleOpsAction, handleOpsHealth };
