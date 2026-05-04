@@ -25,7 +25,7 @@ import { handleFeed, handleFeedDebug, handlePostDetail } from "./feed-service.js
 import { sendJson } from "./http-response.js";
 import { handleMapV2Items } from "./map-v2-service.js";
 import { nodebbFetch } from "./nodebb-client.js";
-import { handleOpsHealth } from "./ops-service.js";
+import { handleOpsAction, handleOpsHealth } from "./ops-service.js";
 import {
   handleCreatePost,
   handleGetHistory,
@@ -85,6 +85,8 @@ async function dispatchRoute(route, req, reqUrl, res) {
     }
     case "ops-health":
       return await handleOpsHealth(req, reqUrl, res);
+    case "ops-action":
+      return await handleOpsAction(req, reqUrl, res);
     case "internal-task-board":
       if (isProductionMode()) requireAdmin(req);
       return await handleTaskBoard(req, res);
@@ -171,6 +173,7 @@ const PRE_SETUP_ROUTE_IDS = new Set([
   "setup-status",
   "setup",
   "ops-health",
+  "ops-action",
   "internal-task-board",
   "alias-pool",
   "ai-post-preview",
