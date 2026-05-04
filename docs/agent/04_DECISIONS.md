@@ -4,6 +4,8 @@ This numbered file is the current decision log for future Codex threads. Older r
 
 ## Active Supersessions
 
+- `2026-05-04: Redis Storage First Cut Is Merged But File Mode Remains Default` records the current backend storage migration boundary.
+- `2026-05-04: Vue UI Primitives Are The Frontend Foundation` records the current frontend modernization boundary.
 - `2026-05-03: Map Development Requires Human Assistance` blocks independent Claude Code implementation for Map v2 data/editor/render/floor-plan work.
 - `2026-05-03: Pro Engineering Decision - Stabilize Before Expanding` is the current route for task priority and repo split pacing.
 - `2026-05-03: Map V2 Editor Phases 1A-1C And Phase 2 Complete` supersedes earlier map editor planning.
@@ -11,6 +13,70 @@ This numbered file is the current decision log for future Codex threads. Older r
 - `2026-05-02: Frontend App Split Is The New Baseline` supersedes old references to `public/app.js` as one 2,151-line frontend file.
 - `2026-05-02: NodeBB Integration Boundary Is Formalized` is the current NodeBB architecture reference.
 - `2026-05-02: API Contract Is Frozen For Repo Split` supersedes any assumptions about shared in-repo API knowledge.
+
+## 2026-05-04: Redis Storage First Cut Is Merged But File Mode Remains Default
+
+Reference: `docs/agent/references/GITHUB_RECENT_UPDATES_2026-05-04.md`
+
+The backend now has an optional Redis-backed storage mode and file-to-Redis migration path.
+
+Merged surface:
+
+- `redis` dependency in backend `package.json`.
+- `src/server/storage/redis-client.js` for Redis config and connection management.
+- `src/server/storage/redis-store.js` for LIAN Redis key helpers.
+- `scripts/migrate-data-to-redis.js` for copying file-backed JSON/JSONL data into Redis.
+- `scripts/verify-redis-migration.js` for comparing file-backed source counts against Redis data.
+- `data-store.js` can route supported reads/writes through Redis when Redis storage mode is enabled.
+- `map-v2-service.js` reads map locations/layers through the storage facade.
+
+Boundary:
+
+- `LIAN_STORAGE_MODE=file` remains the safe default.
+- Redis mode is a backend storage first cut, not a full PostgreSQL migration and not a full domain data model redesign.
+- File-backed JSON/JSONL data must not be deleted immediately after migration. Keep files as rollback/source snapshots until Redis mode has passed staging/production validation.
+- Migration refuses Redis DB `1` because NodeBB uses DB 1 on this server. LIAN default is DB `2` with `lian:` key prefix.
+- Future DB work should separate three concepts: Redis storage rollout, long-term relational schema/RFC, and product permission/audience modeling.
+
+Operational validation before enabling Redis mode:
+
+```bash
+npm install
+npm run migrate:redis -- --clear
+npm run verify:redis
+LIAN_STORAGE_MODE=redis npm start
+```
+
+## 2026-05-04: Vue UI Primitives Are The Frontend Foundation
+
+Reference: `docs/agent/references/GITHUB_RECENT_UPDATES_2026-05-04.md`
+
+The frontend repo now has a Vue 3 + Vite + TypeScript primitive layer under `src/ui/`.
+
+Merged surface:
+
+- `BottomTabBar.vue`
+- `GlassPanel.vue`
+- `IdentityBadge.vue`
+- `InlineError.vue`
+- `LianButton.vue`
+- `LocationChip.vue`
+- `Sheet.vue`
+- `TagChip.vue`
+- `Toast.vue`
+- `TopBar.vue`
+- `TrustBadge.vue`
+- `TypeChip.vue`
+- `src/ui/index.ts`
+- `src/ui/primitives.css`
+
+Boundary:
+
+- Vue primitives are the reusable foundation for future frontend modernization.
+- The legacy static mobile frontend remains active until each page/feature is migrated and validated.
+- Do not combine broad primitive redesign, page migration, and product behavior changes in one PR.
+- Page-level migration should proceed one boundary at a time: feed, publish, map, messages, profile, detail.
+- The frontend validation workflow now builds the Vue entry and smoke-tests the legacy static rehearsal path.
 
 ## 2026-05-03: Pro Engineering Decision - Stabilize Before Expanding
 
