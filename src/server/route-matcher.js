@@ -4,6 +4,7 @@
 const EXACT_ROUTES = [
   { method: "GET", path: "/api/setup/status", id: "setup-status" },
   { method: "POST", path: "/api/setup", id: "setup" },
+  { method: "GET", path: "/api/ops/health", id: "ops-health" },
   { method: "GET", path: "/api/internal/task-board", id: "internal-task-board" },
   { method: "GET", path: "/api/alias-pool", id: "alias-pool" },
   { method: "POST", path: "/api/ai/post-preview", id: "ai-post-preview" },
