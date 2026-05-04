@@ -14,7 +14,11 @@ warnDevelopmentSecurityMode();
 const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
   if (reqUrl.pathname === "/api/ops/deploy-webhook") {
-    await handleOpsDeployWebhook(req, reqUrl, res);
+    try {
+      await handleOpsDeployWebhook(req, reqUrl, res);
+    } catch (error) {
+      sendText(res, error?.status || 500, error?.message || "deploy webhook error", "application/json; charset=utf-8");
+    }
     return;
   }
   if (reqUrl.pathname.startsWith("/api/")) {
