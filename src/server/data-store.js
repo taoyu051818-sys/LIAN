@@ -2,9 +2,61 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { memory } from "./cache.js";
-import { authUsersPath, channelReadsPath, metadataPath, rulesPath, userCachePath } from "./paths.js";
+import {
+  aliasPoolPath,
+  authUsersPath,
+  channelReadsPath,
+  clubsPath,
+  locationsPath,
+  mapV2LayersPath,
+  metadataPath,
+  rulesPath,
+  userCachePath
+} from "./paths.js";
+import { isRedisStorageEnabled, redisConfig } from "./storage/redis-client.js";
+import { KEYS, appendJsonArrayKey, readJsonKey, writeJsonKey } from "./storage/redis-store.js";
+
+const DEFAULT_RULES = { tabs: ["精选"], pinnedTids: [], tagWeights: {}, recencyHalfLifeHours: 96, coverBonus: 0 };
+const DEFAULT_METADATA_FILE = { items: {} };
+const DEFAULT_CHANNEL_READS = { version: 1, items: {} };
+const DEFAULT_USER_CACHE = { version: 1, users: {}, actors: {} };
+
+function redisStorageEnabled() {
+  return isRedisStorageEnabled();
+}
+
+function redisStorageKeyForPath(filePath = "") {
+  const resolved = path.resolve(filePath);
+  const map = new Map([
+    [path.resolve(rulesPath), KEYS.rules],
+    [path.resolve(metadataPath), KEYS.metadata],
+    [path.resolve(channelReadsPath), KEYS.channelReads],
+    [path.resolve(authUsersPath), KEYS.authStore],
+    [path.resolve(userCachePath), KEYS.userCache],
+    [path.resolve(locationsPath), KEYS.mapLocations],
+    [path.resolve(mapV2LayersPath), KEYS.mapLayers],
+    [path.resolve(aliasPoolPath), KEYS.aliasPool],
+    [path.resolve(clubsPath), KEYS.clubs]
+  ]);
+  return map.get(resolved) || null;
+}
+
+async function readJsonData(filePath, fallback) {
+  const key = redisStorageEnabled() ? redisStorageKeyForPath(filePath) : null;
+  if (key) return await readJsonKey(key, fallback);
+  try {
+    return JSON.parse(await fs.readFile(filePath, "utf8"));
+  } catch {
+    return fallback;
+  }
+}
 
 async function writeJsonFile(filePath, data) {
+  const key = redisStorageEnabled() ? redisStorageKeyForPath(filePath) : null;
+  if (key) {
+    await writeJsonKey(key, data);
+    return;
+  }
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   const tmpPath = `${filePath}.tmp`;
   await fs.writeFile(tmpPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
@@ -13,6 +65,17 @@ async function writeJsonFile(filePath, data) {
 
 async function appendJsonLine(filePath, data) {
   try {
+    if (redisStorageEnabled()) {
+      const base = path.basename(filePath);
+      if (base === "ai-post-drafts.jsonl") {
+        await appendJsonArrayKey(KEYS.aiDrafts, data);
+        return;
+      }
+      if (base === "ai-post-records.jsonl") {
+        await appendJsonArrayKey(KEYS.aiRecords, data);
+        return;
+      }
+    }
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.appendFile(filePath, `${JSON.stringify(data)}\n`, "utf8");
   } catch (cause) {
@@ -26,12 +89,7 @@ async function appendJsonLine(filePath, data) {
 async function loadRules() {
   const now = Date.now();
   if (memory.rules && now - memory.rulesLoadedAt < 15_000) return memory.rules;
-  try {
-    const raw = await fs.readFile(rulesPath, "utf8");
-    memory.rules = JSON.parse(raw);
-  } catch {
-    memory.rules = { tabs: ["精选"], pinnedTids: [], tagWeights: {}, recencyHalfLifeHours: 96, coverBonus: 0 };
-  }
+  memory.rules = await readJsonData(rulesPath, DEFAULT_RULES);
   memory.rulesLoadedAt = now;
   return memory.rules;
 }
@@ -39,13 +97,8 @@ async function loadRules() {
 async function loadMetadata() {
   const now = Date.now();
   if (memory.metadata && now - memory.metadataLoadedAt < 15_000) return memory.metadata;
-  try {
-    const raw = await fs.readFile(metadataPath, "utf8");
-    const data = JSON.parse(raw);
-    memory.metadata = data.items || {};
-  } catch {
-    memory.metadata = {};
-  }
+  const data = await readJsonData(metadataPath, DEFAULT_METADATA_FILE);
+  memory.metadata = data.items || data || {};
   memory.metadataLoadedAt = now;
   return memory.metadata;
 }
@@ -54,6 +107,13 @@ let metadataWriteQueue = Promise.resolve();
 let authWriteQueue = Promise.resolve();
 
 async function backupMetadata() {
+  if (redisStorageEnabled()) {
+    const metadata = await readJsonData(metadataPath, DEFAULT_METADATA_FILE);
+    const backupPath = `${metadataPath}.redis-backup-${Date.now()}.json`;
+    await fs.mkdir(path.dirname(backupPath), { recursive: true });
+    await fs.writeFile(backupPath, `${JSON.stringify(metadata, null, 2)}\n`, "utf8");
+    return backupPath;
+  }
   try {
     const raw = await fs.readFile(metadataPath, "utf8");
     const backupPath = `${metadataPath}.bak`;
@@ -68,8 +128,7 @@ async function patchPostMetadata(tid, patch = {}) {
   const key = String(Number(tid) || tid || "");
   if (!key) return;
   metadataWriteQueue = metadataWriteQueue.then(async () => {
-    const raw = await fs.readFile(metadataPath, "utf8").catch(() => "{\"items\":{}}");
-    const data = JSON.parse(raw || "{\"items\":{}}");
+    const data = await readJsonData(metadataPath, DEFAULT_METADATA_FILE);
     data.items ||= {};
     data.items[key] = { ...(data.items[key] || {}), ...patch };
     await writeJsonFile(metadataPath, data);
@@ -83,21 +142,15 @@ async function patchPostMetadata(tid, patch = {}) {
 async function loadChannelReads() {
   const now = Date.now();
   if (memory.channelReads && now - memory.channelReadsLoadedAt < 5_000) return memory.channelReads;
-  try {
-    const raw = await fs.readFile(channelReadsPath, "utf8");
-    const data = JSON.parse(raw);
-    memory.channelReads = data && typeof data === "object" ? data : { version: 1, items: {} };
-  } catch {
-    memory.channelReads = { version: 1, items: {} };
-  }
+  const data = await readJsonData(channelReadsPath, DEFAULT_CHANNEL_READS);
+  memory.channelReads = data && typeof data === "object" ? data : { ...DEFAULT_CHANNEL_READS };
   if (!memory.channelReads.items || typeof memory.channelReads.items !== "object") memory.channelReads.items = {};
   memory.channelReadsLoadedAt = now;
   return memory.channelReads;
 }
 
 async function saveChannelReads(data) {
-  await fs.mkdir(path.dirname(channelReadsPath), { recursive: true });
-  await fs.writeFile(channelReadsPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+  await writeJsonFile(channelReadsPath, data);
   memory.channelReads = data;
   memory.channelReadsLoadedAt = Date.now();
 }
@@ -113,12 +166,8 @@ function normalizeAuthStore(data = {}) {
 }
 
 async function loadAuthStore() {
-  try {
-    const raw = await fs.readFile(authUsersPath, "utf8");
-    return normalizeAuthStore(JSON.parse(raw));
-  } catch {
-    return normalizeAuthStore();
-  }
+  const data = await readJsonData(authUsersPath, null);
+  return normalizeAuthStore(data || {});
 }
 
 async function saveAuthStore(data) {
@@ -140,13 +189,8 @@ async function updateAuthStore(mutator) {
 async function loadUserCache() {
   const now = Date.now();
   if (memory.userCache && now - memory.userCacheLoadedAt < 15_000) return memory.userCache;
-  try {
-    const raw = await fs.readFile(userCachePath, "utf8");
-    const data = JSON.parse(raw);
-    memory.userCache = data && typeof data === "object" ? data : { version: 1, users: {}, actors: {} };
-  } catch {
-    memory.userCache = { version: 1, users: {}, actors: {} };
-  }
+  const data = await readJsonData(userCachePath, DEFAULT_USER_CACHE);
+  memory.userCache = data && typeof data === "object" ? data : { ...DEFAULT_USER_CACHE };
   if (!memory.userCache.users) memory.userCache.users = {};
   if (!memory.userCache.actors) memory.userCache.actors = {};
   memory.userCacheLoadedAt = now;
@@ -232,9 +276,12 @@ export {
   loadUserCache,
   normalizeAuthStore,
   patchPostMetadata,
+  readJsonData,
   recordActorMeta,
   recordUserLike,
   recordUserSave,
+  redisConfig,
+  redisStorageEnabled,
   saveAuthStore,
   saveChannelReads,
   saveUserCache,
