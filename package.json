@@ -9,7 +9,12 @@
     "check:encoding": "node scripts/check-encoding-contamination.js",
     "test": "node --test test/*.test.mjs",
     "test:routes": "node scripts/test-routes.js",
-    "check:backend": "node scripts/validate-backend-structure.js"
+    "check:backend": "node scripts/validate-backend-structure.js",
+    "migrate:redis": "node scripts/migrate-data-to-redis.js",
+    "verify:redis": "node scripts/verify-redis-migration.js"
+  },
+  "dependencies": {
+    "redis": "^4.7.0"
   },
   "description": "Backend runtime for LIAN"
 }
