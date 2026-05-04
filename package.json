@@ -1,0 +1,15 @@
+{
+  "name": "lian-platform-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node scripts/validate-backend-structure.js && node scripts/check-encoding-contamination.js",
+    "check:encoding": "node scripts/check-encoding-contamination.js",
+    "test": "node --test test/*.test.mjs",
+    "test:routes": "node scripts/test-routes.js",
+    "check:backend": "node scripts/validate-backend-structure.js"
+  },
+  "description": "Backend runtime for LIAN"
+}

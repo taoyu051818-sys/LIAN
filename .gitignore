@@ -1,0 +1,37 @@
+.env
+*.log
+node_modules/
+npm-debug.log*
+.DS_Store
+
+# Runtime caches and generated scraping/posting artifacts.
+data/nodebb-snapshot.json
+data/channel-reads.json
+data/auth-users.json
+data/user-cache.json
+public/snapshot-assets/
+outputs/club-posts/images/
+outputs/club-posts/*results.json
+outputs/club-posts/publish-club-posts.cjs
+outputs/club-posts/update-club-posts.cjs
+outputs/club-posts/upload-club-images.cjs
+outputs/club-posts/build-html-club-posts.cjs
+outputs/menu-post-*.cjs
+
+# Local Codex/editor artifacts
+outputs/batch*-files.txt
+outputs/contact-sheet-*.jpg
+outputs/photo-post-candidates.md
+outputs/feed-test-plan-*.md
+outputs/generate-wechat-pushes-*.cjs
+outputs/rewrite-wechat-pushes-*.cjs
+outputs/wechat-pushes-*/
+outputs/wewe-last-7-days.json
+data/post-metadata.json.bak-*
+data/*.bak
+data/ai-post-drafts.jsonl
+data/ai-post-records.jsonl
+
+# Claude Code local artifacts
+.claude/
+mimo_test.json

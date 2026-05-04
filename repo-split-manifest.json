@@ -1,0 +1,766 @@
+{
+  "generatedAt": "2026-05-04T08:33:17.634Z",
+  "sourceRoot": "/opt/lian-mobile-web",
+  "targetDir": "/opt/lian-mobile-web/outputs/lian-platform-server-export",
+  "copied": [
+    {
+      "path": "server.js",
+      "bytes": 1722
+    },
+    {
+      "path": "src/server/admin-routes.js",
+      "bytes": 6171
+    },
+    {
+      "path": "src/server/ai-light-publish.js",
+      "bytes": 10317
+    },
+    {
+      "path": "src/server/ai-post-preview.js",
+      "bytes": 16857
+    },
+    {
+      "path": "src/server/alias-service.js",
+      "bytes": 4476
+    },
+    {
+      "path": "src/server/api-router.js",
+      "bytes": 6665
+    },
+    {
+      "path": "src/server/audience-service.js",
+      "bytes": 7189
+    },
+    {
+      "path": "src/server/auth-routes.js",
+      "bytes": 14595
+    },
+    {
+      "path": "src/server/auth-service.js",
+      "bytes": 11715
+    },
+    {
+      "path": "src/server/cache.js",
+      "bytes": 245
+    },
+    {
+      "path": "src/server/channel-service.js",
+      "bytes": 6688
+    },
+    {
+      "path": "src/server/config.js",
+      "bytes": 7284
+    },
+    {
+      "path": "src/server/content-utils.js",
+      "bytes": 12102
+    },
+    {
+      "path": "src/server/data-store.js",
+      "bytes": 7542
+    },
+    {
+      "path": "src/server/feed-service.js",
+      "bytes": 34186
+    },
+    {
+      "path": "src/server/http-response.js",
+      "bytes": 526
+    },
+    {
+      "path": "src/server/image-proxy.js",
+      "bytes": 2074
+    },
+    {
+      "path": "src/server/map-v2-service.js",
+      "bytes": 19391
+    },
+    {
+      "path": "src/server/nodebb-client.js",
+      "bytes": 2476
+    },
+    {
+      "path": "src/server/notification-service.js",
+      "bytes": 6294
+    },
+    {
+      "path": "src/server/paths.js",
+      "bytes": 1143
+    },
+    {
+      "path": "src/server/post-service.js",
+      "bytes": 24937
+    },
+    {
+      "path": "src/server/rate-limit.js",
+      "bytes": 1741
+    },
+    {
+      "path": "src/server/request-security.js",
+      "bytes": 1566
+    },
+    {
+      "path": "src/server/request-utils.js",
+      "bytes": 2731
+    },
+    {
+      "path": "src/server/route-matcher.js",
+      "bytes": 4020
+    },
+    {
+      "path": "src/server/security-headers.js",
+      "bytes": 1468
+    },
+    {
+      "path": "src/server/security-mode.js",
+      "bytes": 1193
+    },
+    {
+      "path": "src/server/setup-page.js",
+      "bytes": 4862
+    },
+    {
+      "path": "src/server/static-data.js",
+      "bytes": 3023
+    },
+    {
+      "path": "src/server/static-server.js",
+      "bytes": 3355
+    },
+    {
+      "path": "src/server/task-board-service.js",
+      "bytes": 375
+    },
+    {
+      "path": "src/server/upload.js",
+      "bytes": 4863
+    },
+    {
+      "path": "data/alias-pool.json",
+      "bytes": 2015
+    },
+    {
+      "path": "data/clubs.json",
+      "bytes": 9198
+    },
+    {
+      "path": "data/feed-rules.json",
+      "bytes": 2716
+    },
+    {
+      "path": "data/locations.json",
+      "bytes": 7897
+    },
+    {
+      "path": "data/map-v2-layers.json",
+      "bytes": 3271
+    },
+    {
+      "path": "data/post-metadata.json",
+      "bytes": 86043
+    },
+    {
+      "path": "data/study-hn-club-discoveries.json",
+      "bytes": 6071
+    },
+    {
+      "path": "scripts/archive-ai-records.js",
+      "bytes": 4073
+    },
+    {
+      "path": "scripts/audit-feed-rules.js",
+      "bytes": 7541
+    },
+    {
+      "path": "scripts/audit-post-metadata.js",
+      "bytes": 5662
+    },
+    {
+      "path": "scripts/check-encoding-contamination.js",
+      "bytes": 2630
+    },
+    {
+      "path": "scripts/cleanup-audience-test.js",
+      "bytes": 4872
+    },
+    {
+      "path": "scripts/deploy.sh",
+      "bytes": 837
+    },
+    {
+      "path": "scripts/diff-feed-snapshots.js",
+      "bytes": 7710
+    },
+    {
+      "path": "scripts/e2e-online-smoke.mjs",
+      "bytes": 6779
+    },
+    {
+      "path": "scripts/import-road-network-preview.js",
+      "bytes": 6134
+    },
+    {
+      "path": "scripts/install-linux-env.sh",
+      "bytes": 428
+    },
+    {
+      "path": "scripts/prepare-backend-repo-export.js",
+      "bytes": 13995
+    },
+    {
+      "path": "scripts/rewrite-test-posts.js",
+      "bytes": 3833
+    },
+    {
+      "path": "scripts/seed-photo-post-candidates.js",
+      "bytes": 47797
+    },
+    {
+      "path": "scripts/setup-audience-test.js",
+      "bytes": 19576
+    },
+    {
+      "path": "scripts/smoke-nodebb-contracts.js",
+      "bytes": 15027
+    },
+    {
+      "path": "scripts/snapshot-feed.js",
+      "bytes": 10891
+    },
+    {
+      "path": "scripts/start-local.ps1",
+      "bytes": 194
+    },
+    {
+      "path": "scripts/test-audience-hydration.js",
+      "bytes": 10591
+    },
+    {
+      "path": "scripts/test-audience.js",
+      "bytes": 12821
+    },
+    {
+      "path": "scripts/test-metadata-write-safety.js",
+      "bytes": 5030
+    },
+    {
+      "path": "scripts/test-routes.js",
+      "bytes": 8703
+    },
+    {
+      "path": "scripts/validate-locations.js",
+      "bytes": 11704
+    },
+    {
+      "path": "scripts/validate-post-metadata.js",
+      "bytes": 5957
+    },
+    {
+      "path": "scripts/validate-project-structure.js",
+      "bytes": 3914
+    },
+    {
+      "path": "test/audience-regression.test.mjs",
+      "bytes": 3455
+    },
+    {
+      "path": "test/remote-auth-regression.test.mjs",
+      "bytes": 2810
+    },
+    {
+      "path": "test/security-regression.test.mjs",
+      "bytes": 10366
+    },
+    {
+      "path": "docs/agent/00_AGENT_RULES.md",
+      "bytes": 4616
+    },
+    {
+      "path": "docs/agent/01_PROJECT_FACT_BASELINE.md",
+      "bytes": 16771
+    },
+    {
+      "path": "docs/agent/03_FILE_OWNERSHIP.md",
+      "bytes": 10502
+    },
+    {
+      "path": "docs/agent/04_DECISIONS.md",
+      "bytes": 15055
+    },
+    {
+      "path": "docs/agent/05_TASK_BOARD.md",
+      "bytes": 59179
+    },
+    {
+      "path": "docs/agent/ARCHITECTURE_WORKPLAN.md",
+      "bytes": 12461
+    },
+    {
+      "path": "docs/agent/MAP_V2_TECH_PLAN.md",
+      "bytes": 3624
+    },
+    {
+      "path": "docs/agent/PROJECT_FILE_INDEX.md",
+      "bytes": 10935
+    },
+    {
+      "path": "docs/agent/PRO_REVIEW_BRIEF.md",
+      "bytes": 13498
+    },
+    {
+      "path": "docs/agent/README.md",
+      "bytes": 3474
+    },
+    {
+      "path": "docs/agent/contracts/api-contract.md",
+      "bytes": 18355
+    },
+    {
+      "path": "docs/agent/domains/AI_POST_PREVIEW.md",
+      "bytes": 8290
+    },
+    {
+      "path": "docs/agent/domains/AUDIENCE_SYSTEM.md",
+      "bytes": 11047
+    },
+    {
+      "path": "docs/agent/domains/FEED_REFACTOR_PLAN.md",
+      "bytes": 14427
+    },
+    {
+      "path": "docs/agent/domains/FEED_SYSTEM.md",
+      "bytes": 2201
+    },
+    {
+      "path": "docs/agent/domains/MAP_SYSTEM.md",
+      "bytes": 3670
+    },
+    {
+      "path": "docs/agent/domains/NODEBB_INTEGRATION.md",
+      "bytes": 33955
+    },
+    {
+      "path": "docs/agent/handoffs/README.md",
+      "bytes": 1640
+    },
+    {
+      "path": "docs/agent/handoffs/admin-editor-v1.md",
+      "bytes": 5330
+    },
+    {
+      "path": "docs/agent/handoffs/ai-light-publish-flow.md",
+      "bytes": 5797
+    },
+    {
+      "path": "docs/agent/handoffs/ai-post-preview.md",
+      "bytes": 3304
+    },
+    {
+      "path": "docs/agent/handoffs/ai-publish-polish.md",
+      "bytes": 2593
+    },
+    {
+      "path": "docs/agent/handoffs/alias-phase-1.md",
+      "bytes": 4837
+    },
+    {
+      "path": "docs/agent/handoffs/alias-phase-2.md",
+      "bytes": 5369
+    },
+    {
+      "path": "docs/agent/handoffs/alias-phase-3.md",
+      "bytes": 4650
+    },
+    {
+      "path": "docs/agent/handoffs/asset-placement-phase2.md",
+      "bytes": 5519
+    },
+    {
+      "path": "docs/agent/handoffs/audience-auth-hydration.md",
+      "bytes": 4485
+    },
+    {
+      "path": "docs/agent/handoffs/audience-permission-design.md",
+      "bytes": 1509
+    },
+    {
+      "path": "docs/agent/handoffs/audience-system-phase1-3.md",
+      "bytes": 9127
+    },
+    {
+      "path": "docs/agent/handoffs/channel-audience-filtering.md",
+      "bytes": 2886
+    },
+    {
+      "path": "docs/agent/handoffs/curves-route-semantics-phase1c.md",
+      "bytes": 4715
+    },
+    {
+      "path": "docs/agent/handoffs/feed-ops-snapshot-diff.md",
+      "bytes": 1498
+    },
+    {
+      "path": "docs/agent/handoffs/feed-optimization.md",
+      "bytes": 3932
+    },
+    {
+      "path": "docs/agent/handoffs/frontend-app-split.md",
+      "bytes": 2083
+    },
+    {
+      "path": "docs/agent/handoffs/frontend-stability-smoke.md",
+      "bytes": 1572
+    },
+    {
+      "path": "docs/agent/handoffs/implementation-batch-2026-05-02.md",
+      "bytes": 4700
+    },
+    {
+      "path": "docs/agent/handoffs/map-v2-bounds-validation.md",
+      "bytes": 2190
+    },
+    {
+      "path": "docs/agent/handoffs/map-v2-editor.md",
+      "bytes": 4221
+    },
+    {
+      "path": "docs/agent/handoffs/map-v2-gaode.md",
+      "bytes": 3534
+    },
+    {
+      "path": "docs/agent/handoffs/map-v2-restore-legacy-geo.md",
+      "bytes": 1910
+    },
+    {
+      "path": "docs/agent/handoffs/map-v2-road-network-import-preview.md",
+      "bytes": 3590
+    },
+    {
+      "path": "docs/agent/handoffs/metadata-write-safety.md",
+      "bytes": 2323
+    },
+    {
+      "path": "docs/agent/handoffs/nodebb-contract-smoke-tests.md",
+      "bytes": 2446
+    },
+    {
+      "path": "docs/agent/handoffs/nodebb-detail-actions-profile-history.md",
+      "bytes": 4529
+    },
+    {
+      "path": "docs/agent/handoffs/nodebb-integration-audit.md",
+      "bytes": 1864
+    },
+    {
+      "path": "docs/agent/handoffs/nodebb-like-feed-card.md",
+      "bytes": 2014
+    },
+    {
+      "path": "docs/agent/handoffs/nodebb-native-capability-inventory.md",
+      "bytes": 2727
+    },
+    {
+      "path": "docs/agent/handoffs/nodebb-reply-notifications-messages.md",
+      "bytes": 6201
+    },
+    {
+      "path": "docs/agent/handoffs/p0-publish-profile-nodebb-regression-fix.md",
+      "bytes": 15429
+    },
+    {
+      "path": "docs/agent/handoffs/pc-task-board-webui-v1.md",
+      "bytes": 2509
+    },
+    {
+      "path": "docs/agent/handoffs/pc-task-board-webui.md",
+      "bytes": 1363
+    },
+    {
+      "path": "docs/agent/handoffs/post-metadata-gap-check.md",
+      "bytes": 1675
+    },
+    {
+      "path": "docs/agent/handoffs/pro-engineering-decision-task-split.md",
+      "bytes": 2023
+    },
+    {
+      "path": "docs/agent/handoffs/publish-v2-page.md",
+      "bytes": 9385
+    },
+    {
+      "path": "docs/agent/handoffs/repo-split-backend-bootstrap.md",
+      "bytes": 3328
+    },
+    {
+      "path": "docs/agent/handoffs/repo-split-frontend-backend.md",
+      "bytes": 3873
+    },
+    {
+      "path": "docs/agent/handoffs/road-draw-mvp.md",
+      "bytes": 4648
+    },
+    {
+      "path": "docs/agent/handoffs/road-junctions-phase1b.md",
+      "bytes": 4866
+    },
+    {
+      "path": "docs/agent/handoffs/route-matcher-tests.md",
+      "bytes": 1985
+    },
+    {
+      "path": "docs/agent/references/DOC_CLEANUP_AUDIT_2026-05-03.md",
+      "bytes": 11675
+    },
+    {
+      "path": "docs/agent/references/GITHUB_RECENT_UPDATES_2026-05-04.md",
+      "bytes": 12375
+    },
+    {
+      "path": "docs/agent/references/HIGH_RISK_AREAS.md",
+      "bytes": 14279
+    },
+    {
+      "path": "docs/agent/references/PRO_ENGINEERING_DECISION_2026-05-03.md",
+      "bytes": 5926
+    },
+    {
+      "path": "docs/agent/references/RECENT_WORK_HANDOFF_2026-05-04.md",
+      "bytes": 6665
+    },
+    {
+      "path": "docs/agent/references/RPO_NEXT_STEP_BRIEF_2026-05-03.md",
+      "bytes": 15067
+    },
+    {
+      "path": "docs/agent/tasks/ai-post-preview.md",
+      "bytes": 2862
+    },
+    {
+      "path": "docs/agent/tasks/ai-publish-polish.md",
+      "bytes": 2768
+    },
+    {
+      "path": "docs/agent/tasks/audience-auth-hydration.md",
+      "bytes": 6664
+    },
+    {
+      "path": "docs/agent/tasks/audience-permission-design.md",
+      "bytes": 2234
+    },
+    {
+      "path": "docs/agent/tasks/audience-system-test-plan.md",
+      "bytes": 9365
+    },
+    {
+      "path": "docs/agent/tasks/audience-test-users-and-posts.md",
+      "bytes": 8964
+    },
+    {
+      "path": "docs/agent/tasks/audience-write-side-minimum-audit.md",
+      "bytes": 3695
+    },
+    {
+      "path": "docs/agent/tasks/channel-messages-audience-filtering.md",
+      "bytes": 3944
+    },
+    {
+      "path": "docs/agent/tasks/feed-ops-snapshot-diff.md",
+      "bytes": 1432
+    },
+    {
+      "path": "docs/agent/tasks/feed-optimization.md",
+      "bytes": 1965
+    },
+    {
+      "path": "docs/agent/tasks/frontend-stability-smoke.md",
+      "bytes": 4496
+    },
+    {
+      "path": "docs/agent/tasks/high-risk-execution-plan.md",
+      "bytes": 10029
+    },
+    {
+      "path": "docs/agent/tasks/lane-f-messages-review-rerun.md",
+      "bytes": 2575
+    },
+    {
+      "path": "docs/agent/tasks/map-v2-admin-editor.md",
+      "bytes": 18355
+    },
+    {
+      "path": "docs/agent/tasks/map-v2-bounds-picker-validation.md",
+      "bytes": 6034
+    },
+    {
+      "path": "docs/agent/tasks/map-v2-building-floor-plan.md",
+      "bytes": 2992
+    },
+    {
+      "path": "docs/agent/tasks/map-v2-data-assets.md",
+      "bytes": 2696
+    },
+    {
+      "path": "docs/agent/tasks/map-v2-render-workflow.md",
+      "bytes": 4084
+    },
+    {
+      "path": "docs/agent/tasks/map-v2-restore-legacy-geo.md",
+      "bytes": 4454
+    },
+    {
+      "path": "docs/agent/tasks/map-v2-road-network-import-preview.md",
+      "bytes": 8199
+    },
+    {
+      "path": "docs/agent/tasks/map-v2-tech-plan.md",
+      "bytes": 1693
+    },
+    {
+      "path": "docs/agent/tasks/metadata-write-safety.md",
+      "bytes": 3268
+    },
+    {
+      "path": "docs/agent/tasks/nodebb-contract-smoke-tests.md",
+      "bytes": 3882
+    },
+    {
+      "path": "docs/agent/tasks/nodebb-detail-actions-profile-history.md",
+      "bytes": 10032
+    },
+    {
+      "path": "docs/agent/tasks/nodebb-integration-audit.md",
+      "bytes": 2170
+    },
+    {
+      "path": "docs/agent/tasks/nodebb-like-feed-card-validation.md",
+      "bytes": 3353
+    },
+    {
+      "path": "docs/agent/tasks/nodebb-native-capability-inventory.md",
+      "bytes": 3293
+    },
+    {
+      "path": "docs/agent/tasks/nodebb-reply-notifications-messages.md",
+      "bytes": 6539
+    },
+    {
+      "path": "docs/agent/tasks/online-e2e-smoke.md",
+      "bytes": 2536
+    },
+    {
+      "path": "docs/agent/tasks/p0-publish-profile-nodebb-regression-fix.md",
+      "bytes": 13716
+    },
+    {
+      "path": "docs/agent/tasks/pc-task-board-webui.md",
+      "bytes": 6199
+    },
+    {
+      "path": "docs/agent/tasks/project-file-index-and-doc-cleanup.md",
+      "bytes": 11477
+    },
+    {
+      "path": "docs/agent/tasks/publish-v2-browser-acceptance.md",
+      "bytes": 3276
+    },
+    {
+      "path": "docs/agent/tasks/publish-v2-page.md",
+      "bytes": 12943
+    },
+    {
+      "path": "docs/agent/tasks/repo-split-frontend-backend.md",
+      "bytes": 10317
+    },
+    {
+      "path": "docs/agent/tasks/route-matcher-tests.md",
+      "bytes": 2760
+    },
+    {
+      "path": "docs/agent/templates/HANDOFF_TEMPLATE.md",
+      "bytes": 969
+    },
+    {
+      "path": "docs/agent/templates/TASK_TEMPLATE.md",
+      "bytes": 1533
+    },
+    {
+      "path": "package.json",
+      "bytes": 413
+    },
+    {
+      "path": "package-lock.json",
+      "bytes": 193
+    },
+    {
+      "path": ".env.example",
+      "bytes": 582
+    },
+    {
+      "path": ".gitignore",
+      "bytes": 903
+    },
+    {
+      "path": "CLAUDE.md",
+      "bytes": 6088
+    },
+    {
+      "path": "README.md",
+      "bytes": 4443
+    }
+  ],
+  "skipped": [
+    {
+      "path": "data/ai-post-drafts.jsonl",
+      "reason": "local-runtime-or-backup-data"
+    },
+    {
+      "path": "data/ai-post-records.jsonl",
+      "reason": "local-runtime-or-backup-data"
+    },
+    {
+      "path": "data/auth-users.backup.20260504-003616.json",
+      "reason": "secret-or-local-runtime"
+    },
+    {
+      "path": "data/auth-users.json",
+      "reason": "secret-or-local-runtime"
+    },
+    {
+      "path": "data/channel-reads.json",
+      "reason": "local-runtime-or-backup-data"
+    },
+    {
+      "path": "data/post-metadata.conflict-backup.20260504-013319.json",
+      "reason": "local-runtime-or-backup-data"
+    },
+    {
+      "path": "data/post-metadata.server-backup.20260504-003203.json",
+      "reason": "local-runtime-or-backup-data"
+    },
+    {
+      "path": "data/post-metadata.server-backup.20260504-013042.json",
+      "reason": "local-runtime-or-backup-data"
+    },
+    {
+      "path": "data/user-cache.json",
+      "reason": "secret-or-local-runtime"
+    },
+    {
+      "path": "scripts/smoke-frontend.js",
+      "reason": "frontend-only"
+    }
+  ],
+  "generated": [
+    {
+      "path": "package.json",
+      "bytes": 530,
+      "reason": "backend package metadata and scripts"
+    },
+    {
+      "path": "scripts/validate-backend-structure.js",
+      "bytes": 4168,
+      "reason": "backend-only structure validation"
+    }
+  ],
+  "missing": []
+}
