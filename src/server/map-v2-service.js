@@ -1,8 +1,6 @@
-import fs from "node:fs/promises";
-
 import { canViewPost } from "./audience-service.js";
 import { getCurrentUser } from "./auth-service.js";
-import { loadMetadata, writeJsonFile } from "./data-store.js";
+import { loadMetadata, readJsonData, writeJsonFile } from "./data-store.js";
 import { sendJson } from "./http-response.js";
 import { locationsPath, mapV2LayersPath } from "./paths.js";
 import { readJsonBody } from "./request-utils.js";
@@ -257,17 +255,9 @@ function normalizeJunction(item = {}) {
   };
 }
 
-async function readJson(filePath, fallback) {
-  try {
-    return JSON.parse(await fs.readFile(filePath, "utf8"));
-  } catch {
-    return fallback;
-  }
-}
-
 async function loadMapV2Data() {
-  const locationsRaw = await readJson(locationsPath, { version: 1, coordSystem: "gcj02", items: [] });
-  const layersRaw = await readJson(mapV2LayersPath, {
+  const locationsRaw = await readJsonData(locationsPath, { version: 1, coordSystem: "gcj02", items: [] });
+  const layersRaw = await readJsonData(mapV2LayersPath, {
     version: 1,
     coordSystem: "gcj02",
     center: DEFAULT_CENTER,
