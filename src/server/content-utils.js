@@ -182,9 +182,7 @@ function normalizePostImageUrl(url = "", { width = 900 } = {}) {
 }
 
 function proxiedPostImageUrl(url = "", { width = 900 } = {}) {
-  const normalized = normalizePostImageUrl(url, { width });
-  if (!/^https:\/\/res\.cloudinary\.com\/[^/]+\/image\/upload\//.test(normalized)) return normalized;
-  return `${config.imageProxyPublicBaseUrl}/api/image-proxy?url=${encodeURIComponent(normalized)}`;
+  return normalizePostImageUrl(url, { width });
 }
 
 function cloudinaryWarmupUrls(url = "") {
