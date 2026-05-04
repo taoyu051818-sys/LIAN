@@ -163,12 +163,10 @@ cat /tmp/lian-frontend-static.log || true
 function backendRestartScript() {
   return `
 cd ${shellQuote(backendRepoDir)}
-lsof -t -iTCP:${Number(config.port)} -sTCP:LISTEN -n -P | xargs -r kill -9 || true
-lsof -t -iTCP:${Number(config.imageProxyPort)} -sTCP:LISTEN -n -P | xargs -r kill -9 || true
-sleep 1
-nohup npm start > /tmp/lian-platform-server.log 2>&1 &
-sleep 1
-cat /tmp/lian-platform-server.log || true
+pm2 restart lian-platform-server --update-env || pm2 start server.js --name lian-platform-server --update-env
+pm2 save
+sleep 2
+pm2 list
 `;
 }
 
@@ -188,6 +186,7 @@ cd ${shellQuote(backendRepoDir)}
 git fetch origin
 git checkout main
 git pull --ff-only origin main
+npm install
 ${backendRestartScript()}
 `;
 }
