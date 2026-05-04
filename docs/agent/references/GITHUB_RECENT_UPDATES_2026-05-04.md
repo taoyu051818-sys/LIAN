@@ -1,367 +1,255 @@
 # GitHub Recent Updates - 2026-05-04
 
-This note summarizes the recent GitHub updates that are already in the local `main` branch and pushed to the full-stack remote.
+This note is the current source for recent GitHub changes across the split LIAN repositories.
 
-Target full-stack remote:
+Repositories:
 
-- `full`: `https://github.com/taoyu051818-sys/lian-mobile-web-full.git`
+- Frontend: `taoyu051818-sys/lian-mobile-web`
+- Backend: `taoyu051818-sys/lian-platform-server`
 
-Current recent commit chain:
+Last refreshed from GitHub commit history: 2026-05-04.
+
+---
+
+## Latest main-branch commits reviewed
+
+### Frontend repo: `lian-mobile-web`
 
 ```text
-22e3126 统一生产/开发安全模式
-4cbd478 同源检查改为生产模式启用
-5cbb359 开发模式启动警告
-2892457 认证限流改为生产模式启用
-d4d2eec setup/status 开发暴露、生产隐藏
-b2b09cd 生产/开发安全模式测试
-5c0164e 新增生产安全响应头
-834bff2 API 响应接入安全头
-e10d18b 静态资源接入安全头
-6fe885a 生产模式 Cookie 加 Secure
-02d8941 安全头和 Secure Cookie 测试
-8eb4d9e fix: keep fixed headers outside scroll flow
-e424c07 fix: refine detail layout and view transitions
-596715d feat: stabilize publish map and project baseline
-288cc49 docs(agent): documentation cleanup per review feedback
-77d3cd2 docs(agent): add mock API review entry and doc cleanup audit
-d822302 feat(data-store): serialize metadata writes with promise queue
-c2da517 feat(routes): add route matcher module and 61 route tests
-de16857 docs(agent): high-risk areas reference for 6 critical subsystems
-c379c35 feat: like/save/report, map editor v1, publish page, docs refresh
-2cf148f feat(audience): read-side enforcement with test infrastructure
+a4e140a  Merge PR #8: Add frontend build validation workflow
+7e3962c  Document frontend validation commands
+c657b78  Add frontend build validation workflow
+89d6237  Merge PR #7: Add Vue UI primitives foundation
+9bc8403  Validate Vue UI primitives
+1543b98  Show Vue UI primitives in shell
+c974f25  Import Vue primitive styles
+2355091  Add Vue UI primitive styles
+ad164ed  Export Vue UI primitives
+d17f994  Add InlineError primitive
+e65ebfb  Add Toast primitive
+6d346d4  Add Sheet primitive
+3b84650  Add BottomTabBar primitive
+2de14e1  Add navigation and feedback primitives
 ```
 
-## Production/Development Security Mode Updates
+### Backend repo: `lian-platform-server`
 
-### `22e3126` - Unified Production/Development Security Mode
+```text
+d8281ea  Merge PR #7: Add Redis full database migration storage
+9f280fb  Document Redis storage configuration
+5063fea  Add Redis migration verification script
+e7f621c  Add Redis data migration script
+9f943f8  Read map data through storage facade
+764bfc1  Add clubs data path
+06c4ee4  Wire data store to Redis storage mode
+bca5804  Add Redis JSON storage helpers
+6ae1f05  Add Redis client helper
+b9d0b1a  Add Redis storage dependency
+6e09afa  Merge PR #6: return deploy webhook errors
+8ccf8f5  fix(ops): return webhook errors instead of hanging
+0e7a86b  Merge PR #5: add GitHub main deploy webhook
+777a5fa  ops: add GitHub main deploy webhook
+6f85c7b  Route deploy webhook endpoint
+c2dc515  Add GitHub deploy webhook handler
+```
 
-Purpose:
+---
 
-- Establish a single security-mode distinction between development and production.
-- Avoid applying production-only protections in local development where they block debugging or setup.
-- Avoid exposing development-only setup/status behavior in production.
+## Frontend: Vue UI primitives foundation
 
-Operational expectation:
-
-- Production deployments must set the expected production environment flag.
-- Development mode should remain explicit and should surface warnings when potentially unsafe settings are active.
-
-### `4cbd478` - Same-Origin Check Enabled In Production Mode
-
-Purpose:
-
-- Same-origin request protection is enforced in production mode.
-- Development mode remains more permissive for local testing and iteration.
-
-Acceptance focus:
-
-- Production requests from disallowed origins should be rejected.
-- Local development requests should not be accidentally blocked by production-only origin policy.
-
-### `5cbb359` - Development Mode Startup Warning
-
-Purpose:
-
-- Make unsafe/non-production runtime mode visible at startup.
-- Reduce the risk of accidentally running a public deployment with development assumptions.
-
-Acceptance focus:
-
-- Startup logs should clearly show when the server is running in development mode.
-- Production startup should not show misleading development warnings.
-
-### `2892457` - Auth Rate Limiting Enabled In Production Mode
-
-Purpose:
-
-- Authentication rate limiting is applied in production mode.
-- Development mode avoids unnecessary friction during local login and test loops.
-
-Acceptance focus:
-
-- Login/register/auth-sensitive endpoints should be rate-limited in production.
-- Local development should remain usable for repeated manual testing.
-
-### `d4d2eec` - Setup/Status Development Exposure, Production Hidden
-
-Purpose:
-
-- Setup/status endpoints or diagnostics may remain visible in development.
-- Production mode must hide or restrict setup/status surfaces that could leak operational details.
-
-Acceptance focus:
-
-- Production must not expose setup helpers or sensitive status details.
-- Development can keep those endpoints for operator setup and debugging.
-
-### `b2b09cd` - Production/Development Security Mode Tests
-
-Purpose:
-
-- Add automated coverage for security-mode behavior.
-- Guard against regressions where production-only protections become inactive or development-only helpers leak.
-
-Acceptance focus:
-
-- Tests must cover both development and production mode behavior.
-- Future security-mode changes should update these tests.
-
-### `5c0164e` - Production Security Response Headers
-
-Purpose:
-
-- Add baseline production response headers for browser-facing security hardening.
-- Reduce common web exposure around framing, sniffing, referrer leakage, and related browser behavior.
-
-Acceptance focus:
-
-- Production responses should include the configured security headers.
-- Header behavior should be consistent across dynamic/API and static responses after the follow-up commits below.
-
-### `834bff2` - API Responses Use Security Headers
-
-Purpose:
-
-- Apply the security header policy to API responses.
-- Prevent API routes from bypassing browser-facing hardening.
-
-Acceptance focus:
-
-- `GET /api/*` and `POST /api/*` responses should include expected production security headers.
-- Error responses should also receive the same baseline headers.
-
-### `e10d18b` - Static Assets Use Security Headers
-
-Purpose:
-
-- Apply the security header policy to static files served from `public/`.
-- Keep HTML, JS, CSS, images, and tool pages aligned with production browser hardening.
-
-Acceptance focus:
-
-- `GET /`, `GET /app*.js`, `GET /styles.css`, and `/tools/*` should include expected production security headers.
-
-### `6fe885a` - Secure Cookie In Production Mode
-
-Purpose:
-
-- Production cookies are marked `Secure`.
-- Development cookies can remain usable on plain `http://localhost`.
-
-Acceptance focus:
-
-- Production session/auth cookies should include `Secure`.
-- Local development over HTTP should still allow login/session testing.
-
-### `02d8941` - Security Headers And Secure Cookie Tests
-
-Purpose:
-
-- Add automated tests for security headers and production `Secure` cookie behavior.
-- Make security-mode behavior reviewable and repeatable.
-
-Acceptance focus:
-
-- Tests should validate production headers on representative API/static responses.
-- Tests should validate production cookies include `Secure`.
-- Tests should validate development mode does not accidentally require HTTPS-only cookies on localhost.
-
-## Security Mode Review Notes
-
-These commits shift the project toward explicit runtime modes. Follow-up reviewers should check:
-
-1. Which environment variable selects production mode.
-2. Whether PM2/server deployment sets that variable.
-3. Whether local development remains usable over `http://localhost:4100`.
-4. Whether production cookies are only marked `Secure` when HTTPS is actually used at the public edge.
-5. Whether reverse proxy headers and same-origin checks agree on the public domain.
-6. Whether setup/status endpoints are hidden or restricted in production.
-
-## 2026-05-04 UI Fixes
-
-### `8eb4d9e` - Fixed Fixed-Header Scroll Regression
-
-Changed file:
-
-- `public/styles.css`
+Merged in `lian-mobile-web` via PR #7.
 
 What changed:
 
-- Removed the base transform from `.view`.
-- Added `.view.is-active { transform: none; }`.
-- This fixes fixed-position headers and controls being pulled into the page scroll flow after the view-transition work.
+- Added reusable Vue UI primitive components under `src/ui/`.
+- Exported primitives through `src/ui/index.ts`.
+- Added shared primitive styles in `src/ui/primitives.css` and imported them into `src/styles/main.css`.
+- Updated `src/App.vue` from a migration placeholder into a visible primitive showcase.
+- Updated `scripts/validate-project-structure.js` so the new UI primitive files are required project structure.
 
-Why it matters:
+New primitive surface:
 
-- Feed chips, message topbar, profile topbar, and other fixed UI elements must stay pinned to the viewport top, not scroll with the content.
-- CSS transforms on a parent create a containing block for `position: fixed`, which caused the regression.
+- `BottomTabBar.vue`
+- `GlassPanel.vue`
+- `IdentityBadge.vue`
+- `InlineError.vue`
+- `LianButton.vue`
+- `LocationChip.vue`
+- `Sheet.vue`
+- `TagChip.vue`
+- `Toast.vue`
+- `TopBar.vue`
+- `TrustBadge.vue`
+- `TypeChip.vue`
+- `index.ts`
+- `primitives.css`
 
-Validation:
+Engineering implication:
+
+- Vue 3 + Vite + TypeScript is no longer only a placeholder shell; it now has a first reusable component layer.
+- Page-level migration should still proceed one boundary at a time.
+- Do not mix feature behavior migrations with broad primitive redesigns in the same PR.
+
+Validation expectation:
 
 ```bash
-node scripts/smoke-frontend.js http://localhost:4100
-node scripts/validate-project-structure.js
-git diff --check -- public/styles.css
+npm run build
+npm run check
 ```
 
-Observed validation result before commit:
+---
 
-- frontend smoke: `21/21`
-- project structure validation: `43/43`
-- diff whitespace check: clean
+## Frontend: validation workflow and README update
 
-### `e424c07` - Detail Layout And View Transition Refinement
-
-Changed files:
-
-- `public/app-feed.js`
-- `public/app-messages-profile.js`
-- `public/app.js`
-- `public/index.html`
-- `public/map-v2.js`
-- `public/menu-data.json`
-- `public/styles.css`
+Merged in `lian-mobile-web` via PR #8.
 
 What changed:
 
-- Detail page now has fixed header and bottom action bar.
-- Reply panel gained count, empty state, and improved reply-submit behavior.
-- `openDetail()` can refresh the current detail view without pushing extra history or forcing scroll jumps.
-- Reply submit can refresh detail and scroll back to the reply panel.
-- Added a reply-focus trigger for detail actions.
-- Added view-transition shell and related CSS.
-- Added `window.MapV2.invalidateSize()` for view-transition/map resizing.
-- Cleaned a menu-data label.
+- Added `.github/workflows/frontend.yml`.
+- Workflow runs on pushes and PRs to `main`.
+- CI uses Node 22, installs dependencies, builds the Vue entry, runs project checks, starts the legacy static rehearsal server, and runs the legacy smoke test.
+- README now documents two frontend modes:
+  - legacy static mobile frontend under `public/`, served by `npm run start:frontend-static`;
+  - Vue 3 + Vite + TypeScript shell, served by `npm run dev`.
+- README documents install, build, rehearsal, and validation commands.
 
-Validation:
+Important note:
 
-```bash
-node --check public/app-feed.js
-node --check public/app-messages-profile.js
-node --check public/app-utils.js
-node --check public/app.js
-node scripts/validate-project-structure.js
-node scripts/smoke-frontend.js http://localhost:4100
-git diff --check
-```
+- The frontend repo currently has no committed lockfile. README explicitly says to commit `package-lock.json` after the first successful local install/build so CI can later use `npm ci` instead of `npm install`.
 
-Observed validation result before commit:
-
-- frontend syntax checks: passed
-- project structure validation: `43/43`
-- frontend smoke: `21/21`
-- diff whitespace check: clean
-
-## Stabilization Batch
-
-### `596715d` - Publish, Map, Project Baseline Stabilization
-
-This was a broad stabilization merge. It touched docs, frontend, backend, data, scripts, map assets, and tool pages.
-
-Main areas:
-
-- Publish V2 stabilization
-- Map v2 bounds, icons, editor, and data assets
-- NodeBB detail/profile regression fixes
-- Messages and notification handoff updates
-- Alias pool and avatar assets
-- Metadata, routes, audience, and NodeBB integration docs
-- Task board web UI tool files
-- Road network preview import artifacts
-- Project file index and repo split documentation
-
-Notable touched areas:
-
-- `public/publish-page.js`
-- `public/app-feed.js`
-- `public/app-messages-profile.js`
-- `public/map-v2.js`
-- `public/styles.css`
-- `public/tools/map-v2-editor.*`
-- `public/tools/task-board.*`
-- `src/server/post-service.js`
-- `src/server/channel-service.js`
-- `src/server/audience-service.js`
-- `src/server/map-v2-service.js`
-- `src/server/task-board-service.js`
-- `data/alias-pool.json`
-- `data/locations.json`
-- `data/map-v2-layers.json`
-- `data/post-metadata.json`
-- `docs/agent/**`
-- `scripts/smoke-frontend.js`
-- `scripts/test-audience-hydration.js`
-- `scripts/validate-locations.js`
-
-Follow-up status:
-
-- Publish V2 browser flow was manually checked by the user and accepted for the main flow.
-- NodeBB like/save/report/profile list behavior was manually checked by the user and accepted.
-- Map development remains human-assisted only.
-- Repo split is directionally accepted but destructive split is still gated.
-
-## Earlier Safety Gates
-
-### `d822302` - Metadata Write Queue
-
-Purpose:
-
-- Serialize writes to `data/post-metadata.json`.
-- Reduce risk of concurrent metadata writes during publish, AI publish, and admin operations.
-
-Status:
-
-- This is part of the stabilization baseline.
-- Future metadata writes should continue to go through the shared data-store/metadata path instead of direct file writes.
-
-### `c2da517` - Route Matcher Tests
-
-Purpose:
-
-- Add route matcher module and `61` route tests.
-- Stabilize the hand-written Node HTTP router before more features are added.
-
-Status:
-
-- Route test coverage is a current safety gate.
-- New APIs should update route tests.
-
-### `2cf148f` - Audience Read-Side Enforcement
-
-Purpose:
-
-- Add audience read-side enforcement with test infrastructure.
-- Protect feed/detail/map/channel style surfaces from obvious visibility leakage.
-
-Status:
-
-- Read-side enforcement is accepted as a baseline.
-- Write-side minimum enforcement remains a separate P0/P1 follow-up in planning.
-
-## Current Engineering Implications
-
-1. The current repo is still the runnable full-stack workspace.
-2. The full-stack GitHub remote is `lian-mobile-web-full`.
-3. Server deployment should pull from `lian-mobile-web-full`, not the old frontend-only remote.
-4. `data/post-metadata.json` on the server may contain runtime updates and can conflict during pull. Back it up before resolving deploy conflicts.
-5. Do not let Map v2 work proceed autonomously without human approval.
-6. Do not expand product scope until Publish V2, NodeBB interactions, messages, audience, and map baseline remain stable after deployment.
-
-## Recommended Server Update Path
-
-Use this only after the full-stack remote is configured correctly on the server:
+Validation expectation:
 
 ```bash
-cd /opt/lian-mobile-web
-git fetch origin
-git pull origin main
 npm install
-node --check server.js
-node scripts/validate-project-structure.js
-node scripts/validate-post-metadata.js
-pm2 restart lian-mobile-web --update-env
-pm2 logs lian-mobile-web --lines 80
+npm run build
+npm run check
+npm run start:frontend-static
+npm test
 ```
 
-If `data/post-metadata.json` has an unresolved conflict on the server, do not discard it blindly. It may contain live runtime metadata. Back it up first, then resolve deliberately.
+---
+
+## Backend: Redis storage and migration path
+
+Merged in `lian-platform-server` via PR #7.
+
+What changed:
+
+- Added `redis` dependency to backend `package.json`.
+- Added backend scripts:
+  - `npm run migrate:redis` -> `node scripts/migrate-data-to-redis.js`
+  - `npm run verify:redis` -> `node scripts/verify-redis-migration.js`
+- Added Redis environment variables to `.env.example`:
+  - `LIAN_DB_DRIVER`
+  - `LIAN_REDIS_HOST`
+  - `LIAN_REDIS_PORT`
+  - `LIAN_REDIS_PASSWORD`
+  - `LIAN_REDIS_DB`
+  - `LIAN_REDIS_KEY_PREFIX`
+  - `LIAN_STORAGE_MODE`
+  - `LIAN_STORAGE_MIGRATION_ALLOW_FILE_FALLBACK`
+- Added storage modules:
+  - `src/server/storage/redis-client.js`
+  - `src/server/storage/redis-store.js`
+- Added `clubsPath` in `src/server/paths.js`.
+- Extended `src/server/data-store.js` so existing JSON/JSONL reads and writes can route through Redis when Redis storage mode is enabled.
+- Updated `src/server/map-v2-service.js` to load map locations/layers through the storage facade instead of direct file reads.
+
+Data covered by migration/verification:
+
+- feed rules
+- post metadata
+- channel reads
+- auth store
+- user cache
+- map locations
+- map layers
+- alias pool
+- clubs
+- AI drafts JSONL
+- AI records JSONL
+
+Operational guardrail:
+
+- Migration refuses Redis DB `1` because NodeBB uses DB 1 on this server.
+- Default LIAN Redis DB is `2` with `lian:` key prefix.
+- `LIAN_STORAGE_MODE=file` remains the safe default.
+- Switch to Redis storage only after migration and verification pass.
+
+Suggested rollout:
+
+```bash
+npm install
+npm run migrate:redis -- --clear
+npm run verify:redis
+LIAN_STORAGE_MODE=redis npm start
+```
+
+Do not delete JSON/JSONL files immediately after migration. Keep them as rollback/source snapshots until Redis mode has been validated in staging or production.
+
+---
+
+## Backend: GitHub deploy webhook
+
+Merged in `lian-platform-server` via PR #5, then fixed by PR #6.
+
+What changed:
+
+- Added a GitHub deploy webhook handler.
+- Routed `/api/ops/deploy-webhook` from the top-level server path before generic `/api/*` dispatch.
+- Added deployment action plumbing through the existing ops service.
+- Fixed error handling so webhook failures return explicit error responses instead of hanging.
+
+Engineering implication:
+
+- Deploy webhook handling is an ops surface, not a frontend-required API.
+- Keep webhook secrets in environment variables only.
+- Any webhook-facing endpoint should return deterministic success/error responses so GitHub delivery logs remain useful.
+
+Validation expectation:
+
+```bash
+node --check server.js
+node scripts/test-routes.js
+npm run check
+```
+
+---
+
+## Current repo split implications
+
+1. `lian-mobile-web` is the frontend/static/Vue workspace.
+2. `lian-platform-server` is the backend runtime and storage workspace.
+3. Frontend validation now has GitHub Actions coverage, but lockfile cleanup is still pending.
+4. Backend runtime data can now be migrated from file-backed JSON/JSONL to Redis-backed storage, but file mode remains the default.
+5. Repo split should continue to treat backend runtime data, Redis migration scripts, NodeBB integration, auth/session data, uploads, image proxy, map admin APIs, and ops webhooks as backend-owned.
+6. Vue primitives are frontend-owned and should be used as the foundation for future page migration, not as an excuse for a broad one-shot rewrite.
+
+---
+
+## Branch cleanup note
+
+After these merges, the following branches had no remaining commits ahead of `main` and can be deleted manually because the current connector cannot delete remote branches:
+
+Frontend safe-delete candidates:
+
+```bash
+git push origin --delete ci/frontend-build-validation
+git push origin --delete design/vue3-ui-entry
+git push origin --delete design/vue-ui-primitives
+git push origin --delete fix/direct-image-delivery
+git push origin --delete ops-healthcheck
+```
+
+Backend safe-delete candidates:
+
+```bash
+git push origin --delete fix/deploy-webhook-error-response
+git push origin --delete ops-github-deploy-webhook
+git push origin --delete ops-web-healthcheck
+```
+
+Do not delete without separate review:
+
+- frontend branches with no common ancestor: `cleanup/frontend-only-repo`, `design/ui-architecture-foundation`
+- backend branches/PRs with remaining work or open review: `fix/image-proxy-allowlist`, `fix/direct-image-delivery`, `redis-migration` if it still exists locally/remotely after PR #7 merge
