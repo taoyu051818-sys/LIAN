@@ -25,6 +25,8 @@ Read these in order before starting implementation work:
 8. `tasks/<task>.md` - current task specification, if present
 9. `handoffs/<task>.md` - latest thread handoff, if present
 
+For production deploy, Redis, PM2, forum gate, and security/development boundaries, read `references/OPS_SECURITY_DEV_BOUNDARY_2026-05-04.md` before changing ports, deployment commands, or storage settings.
+
 ## Current Domain Docs
 
 - `domains/AI_POST_PREVIEW.md` - AI preview and light publish scope
@@ -54,6 +56,7 @@ Read `handoffs/README.md` for the normalized handoff list.
 
 ## References
 
+- `references/OPS_SECURITY_DEV_BOUNDARY_2026-05-04.md` - current production runtime chain, forum-gate security boundary, PM2 deploy rule, Redis DB boundary, and cross-origin troubleshooting notes
 - `references/HIGH_RISK_AREAS.md` - 6 high-risk area audits (frontend load order, feed scoring, NodeBB integration, auth, metadata format, route structure)
 - `references/GITHUB_RECENT_UPDATES_2026-05-04.md` - recent GitHub commit summary and deployment implications
 - `references/RECENT_WORK_HANDOFF_2026-05-04.md` - latest long-thread handoff, accepted behavior, image proxy 4101 split, and deployment notes
