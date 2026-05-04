@@ -18,6 +18,8 @@ const DEPLOY_WEBHOOK_SECRET = process.env.LIAN_DEPLOY_WEBHOOK_SECRET || "";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const backendRepoDir = process.env.LIAN_BACKEND_REPO_DIR || repoRoot;
 const frontendRepoDir = process.env.LIAN_FRONTEND_REPO_DIR || "/opt/lian-mobile-web";
+const frontendServiceName = process.env.LIAN_FRONTEND_SERVICE || "lian-frontend.service";
+const backendPm2Name = process.env.LIAN_BACKEND_PM2_NAME || "lian-platform-server";
 
 const OPS_ACTIONS = new Set([
   "restart-frontend",
@@ -203,7 +205,7 @@ journalctl -u lian-frontend.service -n 40 --no-pager || true
 function backendRestartScript() {
   return `
 cd ${shellQuote(backendRepoDir)}
-pm2 restart lian-platform-server --update-env || pm2 start server.js --name lian-platform-server --update-env
+pm2 restart ${shellQuote(backendPm2Name)} --update-env || pm2 start server.js --name ${shellQuote(backendPm2Name)} --update-env
 pm2 save
 sleep 2
 pm2 list
@@ -228,6 +230,9 @@ git fetch origin
 git checkout main
 git pull --ff-only origin main
 npm install
+node --check server.js
+node --check src/server/ops-service.js
+node --check src/server/request-security.js
 ${backendRestartScript()}
 `;
 }
@@ -343,7 +348,10 @@ async function handleOpsHealth(req, reqUrl, res) {
       mailConfigured: Boolean(config.resendApiKey || config.smtpHost),
       backendRepoDir,
       frontendRepoDir,
-      deployWebhookConfigured: Boolean(DEPLOY_WEBHOOK_SECRET)
+      frontendServiceName,
+      backendPm2Name,
+      deployWebhookConfigured: Boolean(DEPLOY_WEBHOOK_SECRET),
+      opsAdminUsersConfigured: configuredOpsAdminUsers().length > 0
     },
     checks
   });
