@@ -1,88 +1,96 @@
 # Project File Index
 
-Canonical index of every important file group in `lian-mobile-web`. Use this as the starting point for understanding project structure.
+Canonical index of important LIAN file groups across the current frontend/backend split. Use this as the starting point for understanding project structure.
 
 Source-of-truth order: current code > latest handoff > current task > this index > domain docs > architecture workplan > decisions > historical baseline.
 
 ---
 
-## Root
+## Current repositories
+
+| Repository | Purpose | Notes |
+|---|---|---|
+| `taoyu051818-sys/lian-mobile-web` | Frontend/static/Vue workspace | Owns legacy static mobile UI, Vue/Vite entry, frontend assets, frontend validation workflow |
+| `taoyu051818-sys/lian-platform-server` | Backend runtime/storage workspace | Owns NodeBB integration, auth/session, API routes, runtime data, Redis migration, deploy ops |
+
+## Root / repo-level files
 
 | File | Purpose | Status | Repo split |
 |---|---|---|---|
-| `server.js` | HTTP server entry, top-level routing | Active | Backend |
-| `package.json` | Dependencies, scripts | Active | Both |
-| `README.md` | Project overview, dev setup | Current | Frontend |
-| `CLAUDE.md` | Agent operating rules (loaded by Claude Code) | Current | Both |
+| `server.js` | Backend HTTP server entry and top-level route branching | Active | Backend |
+| `package.json` | Dependencies and scripts | Active | Both |
+| `README.md` | Project overview and dev setup | Current | Frontend |
+| `CLAUDE.md` | Agent operating rules loaded by Claude Code | Current | Both |
 | `EDITORIAL_PRINCIPLES.md` | Content style guide | Current | Frontend |
-| `.env.example` | Environment variable template | Current | Backend |
+| `.env.example` | Backend environment template, now includes Redis storage settings | Current | Backend |
 | `.gitignore` | Git ignore rules | Current | Both |
+| `.github/workflows/frontend.yml` | Frontend CI: Vue build, project checks, legacy static smoke | Current | Frontend |
 
-## `src/server/` - Backend services (28 files)
+## Frontend Vue workspace
 
-All backend logic. Each file is a focused module. Target: **Backend repo**.
+Target repo: `lian-mobile-web`.
+
+| Path | Purpose | Status |
+|---|---|---|
+| `index.html` | Vite/Vue entry HTML | Active |
+| `src/App.vue` | Vue shell and UI primitive showcase | Active |
+| `src/styles/main.css` | Vue shell/global styles, imports design tokens and primitives | Active |
+| `src/vite-env.d.ts` | Vite TypeScript declarations | Active |
+| `vite.config.ts` | Vite config | Active |
+| `tsconfig.json` | TypeScript config | Active |
+| `docs/design/LIAN-Campus-UI-UX-Guidelines-V0.1.md` | Frontend design guidelines | Current |
+
+### `src/ui/` - Vue primitives
+
+Reusable UI primitives. These are the first Vue component boundary before page-level migration.
+
+| File | Purpose | Status |
+|---|---|---|
+| `index.ts` | Exports Vue primitives | Active |
+| `primitives.css` | Shared primitive styles | Active |
+| `BottomTabBar.vue` | Bottom navigation primitive | Active |
+| `GlassPanel.vue` | Glass/card panel primitive | Active |
+| `IdentityBadge.vue` | Identity/avatar text primitive | Active |
+| `InlineError.vue` | Inline validation/error primitive | Active |
+| `LianButton.vue` | Button primitive | Active |
+| `LocationChip.vue` | Location chip primitive | Active |
+| `Sheet.vue` | Bottom sheet/dialog primitive | Active |
+| `TagChip.vue` | Tag chip primitive | Active |
+| `Toast.vue` | Toast/status primitive | Active |
+| `TopBar.vue` | Top navigation bar primitive | Active |
+| `TrustBadge.vue` | Trust/status badge primitive | Active |
+| `TypeChip.vue` | Content-type chip primitive | Active |
+
+## `public/` - Legacy static frontend
+
+Classic-script frontend. No ES modules. Script load order matters. Target: **Frontend repo**.
 
 | File | Purpose | Status | Owner |
 |---|---|---|---|
-| `api-router.js` | Route mounting only, no business logic | Active | soft-lock / shared |
-| `feed-service.js` | Recommendation core: scoring, filtering, diversity, curated pages, moment feed | Active | hard-review |
-| `post-service.js` | Publishing core: HTML building, NodeBB topic creation, reply handling | Active | hard-review |
-| `auth-service.js` | User model, password, session, NodeBB uid mapping | Active | soft-lock |
-| `auth-routes.js` | Register/login/logout endpoints | Active | soft-lock |
-| `audience-service.js` | Permission functions (canViewPost etc.) | Active | soft-lock |
-| `notification-service.js` | User-scoped notifications from NodeBB | Active | soft-lock |
-| `channel-service.js` | Campus channel messages | Active | open |
-| `map-v2-service.js` | Map v2 data API, admin writes, bounds validation | Active | soft-lock |
-| `nodebb-client.js` | NodeBB HTTP client, all NodeBB calls go through here | Active | soft-lock |
-| `ai-post-preview.js` | AI draft generation | Active | open |
-| `ai-light-publish.js` | AI draft save + publish | Active | open |
-| `alias-service.js` | Alias pool management | Active | open |
-| `admin-routes.js` | Admin endpoints | Active | open |
-| `task-board-service.js` | Task board markdown API (`/api/internal/task-board`) | Active | open |
-| `content-utils.js` | HTML processing, image URL helpers | Active | soft-lock |
-| `image-proxy.js` | Cloudinary proxy | Active | open |
-| `upload.js` | Image upload to Cloudinary | Active | open |
-| `data-store.js` | JSON file read/write | Active | soft-lock |
-| `config.js` | Environment loading | Active | soft-lock |
-| `route-matcher.js` | URL pattern matching for API router | Active | soft-lock |
-| `static-data.js` | Institutions list, map items | Active | open |
-| `static-server.js` | Static file serving | Active | open |
-| `setup-page.js` | First-run setup page | Active | open |
-| `cache.js` | In-memory cache maps | Active | open |
-| `paths.js` | File path constants | Active | open |
-| `http-response.js` | Response helpers | Active | open |
-| `request-utils.js` | Body parsing, admin auth | Active | open |
-
-## `public/` - Frontend (12 JS files)
-
-Classic-script frontend (no ES modules). Script load order matters. Target: **Frontend repo**.
-
-| File | Purpose | Status | Owner |
-|---|---|---|---|
-| `index.html` | HTML structure, script load order | Active | soft-lock |
-| `styles.css` | All styles | Active | soft-lock |
-| `map-v2.js` | Leaflet map, overlays, location picker (IIFE) | Active | soft-lock |
-| `app-state.js` | Global state, state aliases | Active | soft-lock |
+| `index.html` | Legacy mobile HTML structure and script load order | Active | soft-lock |
+| `styles.css` | Legacy mobile styles | Active | soft-lock |
+| `map-v2.js` | Leaflet map, overlays, location picker IIFE | Active | soft-lock |
+| `app-state.js` | Global state and state aliases | Active | soft-lock |
 | `app-utils.js` | DOM helpers, API helper, upload/compression | Active | soft-lock |
 | `app-auth-avatar.js` | Auth UI, current user loading, avatar crop | Active | soft-lock |
 | `app-feed.js` | Feed tabs, masonry cards, detail view, gallery | Active | soft-lock |
-| `app-legacy-map.js` | Old illustrated map compatibility | Active (legacy compat) | soft-lock |
+| `app-legacy-map.js` | Old illustrated map compatibility | Active legacy compat | soft-lock |
 | `app-ai-publish.js` | AI light publish sheet, preview/draft/publish | Active | soft-lock |
 | `app-messages-profile.js` | Channel messages, replies, profile panel | Active | soft-lock |
 | `app.js` | Event delegation, global listeners, app init | Active | soft-lock |
 | `publish-page.js` | Publish V2 dedicated page, 3-step flow | Active | soft-lock |
 
-Load order: `map-v2.js` -> `app-state.js` -> `app-utils.js` -> feature scripts -> `app.js`
+Load order: `map-v2.js` -> `app-state.js` -> `app-utils.js` -> feature scripts -> `app.js`.
 
 ## `public/tools/` - Internal admin tools
 
-Admin-only pages. Target: **Frontend repo** (admin/internal tools stay with frontend; backend only provides API endpoints).
+Admin-only pages. Target: **Frontend repo**. Backend only provides API endpoints.
 
 | File | Purpose | Status |
 |---|---|---|
 | `map-v2-editor.html` | Map editor page | Active |
 | `map-v2-editor.css` | Map editor styles | Active |
-| `map-v2-editor.js` | Map editor logic (IIFE) | Active |
+| `map-v2-editor.js` | Map editor logic IIFE | Active |
 | `map-georef.html` | Georeferencing tool | Active |
 | `map-coastline-align.html` | Coastline alignment tool | Active |
 | `task-board.html` | PC task board viewer | Active |
@@ -102,27 +110,81 @@ Images, icons, map textures. Target: **Frontend repo**.
 
 Menu prototype HTML/CSS/JS files. Not part of main app. Status: **experimental/demo**.
 
-Target: **Frontend repo** (or move to `public/experimental/`).
+Target: **Frontend repo** or future `public/experimental/`.
+
+## `src/server/` - Backend services
+
+All backend logic. Target: **Backend repo**.
+
+| File | Purpose | Status | Owner |
+|---|---|---|---|
+| `api-router.js` | Route mounting only, no business logic | Active | soft-lock / shared |
+| `feed-service.js` | Recommendation core: scoring, filtering, diversity, curated pages, moment feed | Active | hard-review |
+| `post-service.js` | Publishing core: HTML building, NodeBB topic creation, reply handling | Active | hard-review |
+| `auth-service.js` | User model, password, session, NodeBB uid mapping | Active | soft-lock |
+| `auth-routes.js` | Register/login/logout endpoints | Active | soft-lock |
+| `audience-service.js` | Permission functions including `canViewPost` | Active | soft-lock |
+| `notification-service.js` | User-scoped notifications from NodeBB | Active | soft-lock |
+| `channel-service.js` | Campus channel messages | Active | open |
+| `map-v2-service.js` | Map v2 data API, admin writes, bounds validation; reads through storage facade | Active | soft-lock |
+| `nodebb-client.js` | NodeBB HTTP client; all NodeBB calls go through here | Active | soft-lock |
+| `ai-post-preview.js` | AI draft generation | Active | open |
+| `ai-light-publish.js` | AI draft save + publish | Active | open |
+| `alias-service.js` | Alias pool management | Active | open |
+| `admin-routes.js` | Admin endpoints | Active | open |
+| `task-board-service.js` | Task board markdown API `/api/internal/task-board` | Active | open |
+| `content-utils.js` | HTML processing, image URL helpers | Active | soft-lock |
+| `image-proxy.js` | Cloudinary/image proxy | Active | open |
+| `upload.js` | Image upload to Cloudinary | Active | open |
+| `data-store.js` | Data storage facade for JSON/JSONL file mode and Redis mode | Active | soft-lock |
+| `config.js` | Environment loading | Active | soft-lock |
+| `route-matcher.js` | URL pattern matching for API router | Active | soft-lock |
+| `static-data.js` | Institutions list, map items | Active | open |
+| `static-server.js` | Static file serving | Active | open |
+| `setup-page.js` | First-run setup page | Active | open |
+| `cache.js` | In-memory cache maps | Active | open |
+| `paths.js` | File path constants, including `clubsPath` | Active | open |
+| `http-response.js` | Response helpers | Active | open |
+| `request-utils.js` | Body parsing, admin auth | Active | open |
+| `storage/redis-client.js` | Redis client config/connection helper | Active | soft-lock |
+| `storage/redis-store.js` | Redis JSON/list key helpers and LIAN key names | Active | soft-lock |
 
 ## `data/` - Runtime data
 
+File-backed data remains important even after Redis support. In file mode these files are the active store. In Redis mode they are migration inputs and rollback/source snapshots until Redis has been validated.
+
 | File | Type | Tracked | Policy | Repo split |
 |---|---|---|---|---|
-| `post-metadata.json` | Product data (source of truth) | yes | Never bulk-format. Backup before large changes. | Backend |
-| `feed-rules.json` | Product config | yes | Changes affect all users immediately. | Backend |
-| `locations.json` | Product data (Map v2 coordinates) | yes | Source of truth for map locations. | Backend |
-| `map-v2-layers.json` | Product data (map layer definitions) | yes | Source of truth for map layers. | Backend |
-| `clubs.json` | Static reference | yes | Low change frequency. | Backend |
-| `alias-pool.json` | Operational data | yes | Alias pool. | Backend |
-| `user-cache.json` | Local runtime cache | no | Never commit. Managed by nodebb-client. | Backend |
+| `post-metadata.json` | Product data | yes | Never bulk-format. Backup before large changes. Migrates to Redis key `postmeta:items`. | Backend |
+| `feed-rules.json` | Product config | yes | Changes affect all users immediately. Migrates to Redis key `feed:rules:current`. | Backend |
+| `locations.json` | Product data | yes | Source of truth for map locations in file mode. Migrates to Redis key `map:locations`. | Backend |
+| `map-v2-layers.json` | Product data | yes | Source of truth for map layers in file mode. Migrates to Redis key `map:layers`. | Backend |
+| `clubs.json` | Static reference | yes | Low change frequency. Migrates to Redis key `clubs`. | Backend |
+| `alias-pool.json` | Operational data | yes | Alias pool. Migrates to Redis key `alias:pool`. | Backend |
+| `user-cache.json` | Local runtime cache | no | Never commit. Managed by NodeBB/auth cache. Migrates to Redis key `usercache`. | Backend |
 | `study-hn-club-discoveries.json` | Discovery artifact | yes | Archive candidate. | Backend |
-| `auth-users.json` | Local runtime state | no | Never commit. Managed by auth-service. | Backend |
-| `channel-reads.json` | Local runtime state | no | Never commit. Managed by channel-service. | Backend |
-| `ai-post-drafts.jsonl` | Generated records | no | Append-only. Never hand-edit. | Backend |
-| `ai-post-records.jsonl` | Generated records | no | Append-only. Never hand-edit. | Backend |
-| `post-metadata.json.bak` | Backup | no | In .gitignore (`*.bak`). | Backend |
+| `auth-users.json` | Local runtime state | no | Never commit. Migrates to Redis key `auth:store`. | Backend |
+| `channel-reads.json` | Local runtime state | no | Never commit. Migrates to Redis key `channel:reads`. | Backend |
+| `ai-post-drafts.jsonl` | Generated records | no | Append-only. Never hand-edit. Migrates to Redis list `ai:drafts`. | Backend |
+| `ai-post-records.jsonl` | Generated records | no | Append-only. Never hand-edit. Migrates to Redis list `ai:records`. | Backend |
+| `post-metadata.json.bak` | Backup | no | In `.gitignore` via `*.bak`. | Backend |
 
-## `scripts/` - Validation and ops (22 files)
+## Redis storage mode
+
+Redis support is implemented as an optional backend storage mode.
+
+| Setting / command | Meaning |
+|---|---|
+| `LIAN_STORAGE_MODE=file` | Default safe mode; use file-backed JSON/JSONL storage |
+| `LIAN_STORAGE_MODE=redis` or `db` | Route supported reads/writes through Redis storage facade |
+| `LIAN_REDIS_DB=2` | Default LIAN Redis DB; migration refuses DB 1 because NodeBB uses DB 1 |
+| `LIAN_REDIS_KEY_PREFIX=lian:` | Default Redis key prefix |
+| `npm run migrate:redis` | Copy file-backed JSON/JSONL data into Redis |
+| `npm run verify:redis` | Compare file counts against Redis data after migration |
+
+Do not delete file-backed data immediately after migration. Keep it for rollback until Redis mode has passed staging/production validation.
+
+## `scripts/` - Validation and ops
 
 | File | Lifecycle | Purpose |
 |---|---|---|
@@ -140,14 +202,16 @@ Target: **Frontend repo** (or move to `public/experimental/`).
 | `audit-feed-rules.js` | active | Feed config audit. |
 | `audit-post-metadata.js` | active | Metadata audit. |
 | `import-road-network-preview.js` | active | Road network import tool. |
-| `deploy.sh` | ops | Deployment script. |
-| `install-linux-env.sh` | ops | Linux environment setup. |
-| `start-local.ps1` | ops | Local dev startup (PowerShell). |
-| `archive-ai-records.js` | one-shot | JSONL hygiene. |
-| `setup-audience-test.js` | one-shot | Test data setup. |
-| `cleanup-audience-test.js` | one-shot | Test data cleanup. |
-| `rewrite-test-posts.js` | one-shot | Test post rewriting. |
-| `seed-photo-post-candidates.js` | one-shot | Data seeding tool. |
+| `migrate-data-to-redis.js` | ops | One-way file-to-Redis migration script; supports `--clear` for LIAN-prefixed Redis keys |
+| `verify-redis-migration.js` | ops | Verifies migrated Redis data counts against file-backed source data |
+| `deploy.sh` | ops | Deployment script |
+| `install-linux-env.sh` | ops | Linux environment setup |
+| `start-local.ps1` | ops | Local dev startup PowerShell |
+| `archive-ai-records.js` | one-shot | JSONL hygiene |
+| `setup-audience-test.js` | one-shot | Test data setup |
+| `cleanup-audience-test.js` | one-shot | Test data cleanup |
+| `rewrite-test-posts.js` | one-shot | Test post rewriting |
+| `seed-photo-post-candidates.js` | one-shot | Data seeding tool |
 
 ## `outputs/` - Generated artifacts
 
@@ -155,12 +219,12 @@ Not source of truth. Generated snapshots, reports, publishing artifacts.
 
 | Category | Tracked? | Policy |
 |---|---|---|
-| Feed snapshots (`feed-snapshot-*.md`) | yes | Keep as historical reference |
-| Feed diffs (`feed-diff-*.md`) | yes | Keep as historical reference |
-| Club content (`club-posts/*.md`) | yes | Content reference |
-| Club images (`club-posts/images/`) | no | Ignored. Large binary assets. |
-| Menu scripts (`menu-post-*.cjs`) | no | Ignored. Generated one-shot scripts. |
-| Seed results (`*-result-*.json`) | varies | Archive candidate. |
+| Feed snapshots `feed-snapshot-*.md` | yes | Keep as historical reference |
+| Feed diffs `feed-diff-*.md` | yes | Keep as historical reference |
+| Club content `club-posts/*.md` | yes | Content reference |
+| Club images `club-posts/images/` | no | Ignored. Large binary assets |
+| Menu scripts `menu-post-*.cjs` | no | Ignored. Generated one-shot scripts |
+| Seed results `*-result-*.json` | varies | Archive candidate |
 
 ## `docs/agent/` - Coordination layer
 
@@ -170,7 +234,7 @@ Primary working memory for agent threads. All files open for modification.
 |---|---|---|
 | `README.md` | Docs index, start-here guide, source-of-truth order | Current |
 | `00_AGENT_RULES.md` | Operating rules, validation, high-conflict files | Current |
-| `01_PROJECT_FACT_BASELINE.md` | Early fact baseline | **Historical** - superseded by this index and current code |
+| `01_PROJECT_FACT_BASELINE.md` | Early fact baseline | Historical - superseded by this index and current code |
 | `03_FILE_OWNERSHIP.md` | File ownership and conflict levels | Current |
 | `04_DECISIONS.md` | Recorded architecture/product decisions | Current |
 | `05_TASK_BOARD.md` | Task board with status legend and audit log | Current |
@@ -180,7 +244,7 @@ Primary working memory for agent threads. All files open for modification.
 | `domains/` | Domain documentation | Current |
 | `tasks/` | Task specifications | Active |
 | `handoffs/` | Thread handoffs | Active |
-| `references/` | Audit reports, high-risk areas | Active |
+| `references/` | Audit reports, high-risk areas, recent updates | Active |
 | `templates/` | Templates for tasks and handoffs | Active |
 | `contracts/` | Frozen API contracts | Active |
 
@@ -192,13 +256,15 @@ Primary working memory for agent threads. All files open for modification.
 | `AUDIENCE_SYSTEM.md` | Current | Matches Phase 1-3 implementation |
 | `FEED_SYSTEM.md` | Current | Matches feed-service.js |
 | `FEED_REFACTOR_PLAN.md` | Historical | Planning doc, implementation done |
-| `MAP_SYSTEM.md` | Current | Matches Map v2 implementation |
+| `MAP_SYSTEM.md` | Current | Matches Map v2 implementation; Redis storage means map data reads should use storage facade |
 | `NODEBB_INTEGRATION.md` | Current | Includes failure modes |
 
 ## `docs/agent/references/` - Reference documents
 
 | File | Purpose |
 |---|---|
+| `GITHUB_RECENT_UPDATES_2026-05-04.md` | Current recent GitHub updates across frontend/backend repos |
+| `RECENT_WORK_HANDOFF_2026-05-04.md` | Latest long-thread handoff |
 | `HIGH_RISK_AREAS.md` | 6 high-risk area structured audits |
 | `DOC_CLEANUP_AUDIT_2026-05-03.md` | Documentation cleanup findings |
 | `PRO_ENGINEERING_DECISION_2026-05-03.md` | Pro engineering decision record |
