@@ -1,9 +1,18 @@
 import { isProductionMode } from "./security-mode.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const DEFAULT_ALLOWED_ORIGINS = ["https://lian.nat100.top"];
 
 function firstHeaderValue(value = "") {
   return String(value || "").split(",")[0].trim();
+}
+
+function configuredAllowedOrigins() {
+  const configured = String(process.env.LIAN_ALLOWED_ORIGINS || process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map(normalizeOrigin)
+    .filter(Boolean);
+  return new Set([...DEFAULT_ALLOWED_ORIGINS.map(normalizeOrigin), ...configured]);
 }
 
 function getRequestOrigin(req = {}) {
@@ -29,10 +38,16 @@ function getRequestSourceOrigin(req = {}) {
   return referer;
 }
 
+function isAllowedSourceOrigin(source = "") {
+  const normalized = normalizeOrigin(source);
+  return Boolean(normalized && configuredAllowedOrigins().has(normalized));
+}
+
 function isSameOriginRequest(req = {}) {
-  const expected = normalizeOrigin(getRequestOrigin(req));
   const source = getRequestSourceOrigin(req);
   if (!source) return true;
+  if (isAllowedSourceOrigin(source)) return true;
+  const expected = normalizeOrigin(getRequestOrigin(req));
   return Boolean(expected && source === expected);
 }
 
@@ -48,6 +63,7 @@ function requireSameOrigin(req = {}) {
 export {
   getRequestOrigin,
   getRequestSourceOrigin,
+  isAllowedSourceOrigin,
   isSameOriginRequest,
   normalizeOrigin,
   requireSameOrigin
