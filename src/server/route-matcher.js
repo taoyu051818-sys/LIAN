@@ -6,6 +6,7 @@ const EXACT_ROUTES = [
   { method: "POST", path: "/api/setup", id: "setup" },
   { method: "GET", path: "/api/ops/health", id: "ops-health" },
   { method: "POST", path: "/api/ops/action", id: "ops-action" },
+  { method: "POST", path: "/api/ops/deploy-webhook", id: "ops-deploy-webhook" },
   { method: "GET", path: "/api/internal/task-board", id: "internal-task-board" },
   { method: "GET", path: "/api/alias-pool", id: "alias-pool" },
   { method: "POST", path: "/api/ai/post-preview", id: "ai-post-preview" },

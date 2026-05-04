@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -10,7 +11,9 @@ import { securityModeName } from "./security-mode.js";
 
 const DEFAULT_PUBLIC_BASE_URL = "https://lian.nat100.top";
 const REQUEST_TIMEOUT_MS = 8000;
+const MAX_WEBHOOK_BYTES = 1024 * 1024;
 const OPS_LOG_DIR = process.env.LIAN_OPS_LOG_DIR || "/tmp";
+const DEPLOY_WEBHOOK_SECRET = process.env.LIAN_DEPLOY_WEBHOOK_SECRET || "";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const backendRepoDir = process.env.LIAN_BACKEND_REPO_DIR || repoRoot;
 const frontendRepoDir = process.env.LIAN_FRONTEND_REPO_DIR || "/opt/lian-mobile-web";
@@ -22,6 +25,11 @@ const OPS_ACTIONS = new Set([
   "update-frontend",
   "update-backend",
   "update-all"
+]);
+
+const DEPLOY_REPO_ACTIONS = new Map([
+  ["taoyu051818-sys/lian-mobile-web", "update-frontend"],
+  ["taoyu051818-sys/lian-platform-server", "update-backend"]
 ]);
 
 function normalizeBaseUrl(value = "") {
@@ -36,6 +44,39 @@ function normalizeBaseUrl(value = "") {
 
 function shellQuote(value = "") {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+async function readRawBody(req, maxBytes = MAX_WEBHOOK_BYTES) {
+  const chunks = [];
+  let bytes = 0;
+  for await (const chunk of req) {
+    const buffer = Buffer.from(chunk);
+    bytes += buffer.byteLength;
+    if (bytes > maxBytes) {
+      const error = new Error("webhook body is too large");
+      error.status = 413;
+      throw error;
+    }
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks);
+}
+
+function verifyGithubSignature(rawBody, signatureHeader = "") {
+  if (!DEPLOY_WEBHOOK_SECRET) {
+    const error = new Error("LIAN_DEPLOY_WEBHOOK_SECRET is missing");
+    error.status = 503;
+    throw error;
+  }
+  const expected = `sha256=${crypto.createHmac("sha256", DEPLOY_WEBHOOK_SECRET).update(rawBody).digest("hex")}`;
+  const actual = String(signatureHeader || "").trim();
+  const expectedBuffer = Buffer.from(expected, "utf8");
+  const actualBuffer = Buffer.from(actual, "utf8");
+  if (expectedBuffer.length !== actualBuffer.length || !crypto.timingSafeEqual(expectedBuffer, actualBuffer)) {
+    const error = new Error("invalid GitHub webhook signature");
+    error.status = 401;
+    throw error;
+  }
 }
 
 async function fetchText(url, { method = "GET" } = {}) {
@@ -170,7 +211,7 @@ function scriptForAction(action) {
   }
 }
 
-function scheduleOpsAction(action) {
+function scheduleOpsAction(action, source = "manual") {
   if (!OPS_ACTIONS.has(action)) {
     const error = new Error("unsupported ops action");
     error.status = 400;
@@ -180,6 +221,7 @@ function scheduleOpsAction(action) {
   const script = `
 set -euo pipefail
 {
+  echo "[LIAN ops] source=${source}"
   echo "[LIAN ops] action=${action}"
   echo "[LIAN ops] started_at=$(date -Iseconds)"
   sleep 1
@@ -260,7 +302,8 @@ async function handleOpsHealth(req, reqUrl, res) {
       cloudinaryConfigured: Boolean(config.cloudinaryUrl),
       mailConfigured: Boolean(config.resendApiKey || config.smtpHost),
       backendRepoDir,
-      frontendRepoDir
+      frontendRepoDir,
+      deployWebhookConfigured: Boolean(DEPLOY_WEBHOOK_SECRET)
     },
     checks
   });
@@ -272,7 +315,7 @@ async function handleOpsAction(req, reqUrl, res) {
     return sendJson(res, 405, { error: "method not allowed" });
   }
   const action = String(reqUrl.searchParams.get("action") || "").trim();
-  const scheduled = scheduleOpsAction(action);
+  const scheduled = scheduleOpsAction(action, "manual");
   sendJson(res, 202, {
     ok: true,
     scheduledAt: new Date().toISOString(),
@@ -281,4 +324,62 @@ async function handleOpsAction(req, reqUrl, res) {
   });
 }
 
-export { handleOpsAction, handleOpsHealth };
+async function handleOpsDeployWebhook(req, reqUrl, res) {
+  if (req.method !== "POST") {
+    return sendJson(res, 405, { error: "method not allowed" });
+  }
+
+  const rawBody = await readRawBody(req);
+  verifyGithubSignature(rawBody, req.headers["x-hub-signature-256"] || "");
+
+  const event = String(req.headers["x-github-event"] || "");
+  const delivery = String(req.headers["x-github-delivery"] || "");
+  const payload = JSON.parse(rawBody.toString("utf8") || "{}");
+
+  if (event === "ping") {
+    return sendJson(res, 200, { ok: true, event, delivery, message: "pong" });
+  }
+
+  if (event !== "push") {
+    return sendJson(res, 202, { ok: true, ignored: true, event, delivery, reason: "event is not push" });
+  }
+
+  if (payload.ref !== "refs/heads/main") {
+    return sendJson(res, 202, {
+      ok: true,
+      ignored: true,
+      event,
+      delivery,
+      ref: payload.ref || "",
+      reason: "ref is not refs/heads/main"
+    });
+  }
+
+  const repository = payload.repository?.full_name || "";
+  const action = DEPLOY_REPO_ACTIONS.get(repository);
+  if (!action) {
+    return sendJson(res, 202, {
+      ok: true,
+      ignored: true,
+      event,
+      delivery,
+      repository,
+      reason: "repository is not deployable"
+    });
+  }
+
+  const scheduled = scheduleOpsAction(action, `github:${repository}`);
+  sendJson(res, 202, {
+    ok: true,
+    scheduledAt: new Date().toISOString(),
+    message: "deploy webhook accepted",
+    event,
+    delivery,
+    repository,
+    ref: payload.ref,
+    after: payload.after || "",
+    ...scheduled
+  });
+}
+
+export { handleOpsAction, handleOpsDeployWebhook, handleOpsHealth };
