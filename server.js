@@ -4,6 +4,7 @@ import { isSetupRequired, config } from "./src/server/config.js";
 import { handleApi } from "./src/server/api-router.js";
 import { sendText } from "./src/server/http-response.js";
 import { handleImageProxy } from "./src/server/image-proxy.js";
+import { handleOpsDeployWebhook } from "./src/server/ops-service.js";
 import { setupPageHtml } from "./src/server/setup-page.js";
 import { warnDevelopmentSecurityMode } from "./src/server/security-mode.js";
 import { proxyLianAsset, serveStatic } from "./src/server/static-server.js";
@@ -12,6 +13,10 @@ warnDevelopmentSecurityMode();
 
 const server = http.createServer(async (req, res) => {
   const reqUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+  if (reqUrl.pathname === "/api/ops/deploy-webhook") {
+    await handleOpsDeployWebhook(req, reqUrl, res);
+    return;
+  }
   if (reqUrl.pathname.startsWith("/api/")) {
     await handleApi(req, reqUrl, res);
     return;
