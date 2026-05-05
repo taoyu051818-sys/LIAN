@@ -9,15 +9,33 @@ import { isRedisStorageEnabled } from "./storage/redis-client.js";
 import { readRedisObjectAuthSession, readRedisObjectAuthUserById, writeRedisObjectAuthUser } from "./storage/redis-object-store.js";
 import { authInstitutions } from "./static-data.js";
 
+const TRUST_IDENTITY_TAGS = new Set([
+  "高校认证",
+  "官方认证",
+  "现场核验",
+  "组织者",
+  "活动主办",
+  "地点贡献者",
+  "高质量贡献者",
+  "持续贡献者",
+  "志愿者",
+  "社团负责人"
+]);
+
 function allowedIdentityTags(user = {}) {
-  const tags = Array.isArray(user.tags) ? user.tags : [];
-  return tags.filter((tag) => tag && (tag === "高校认证" || tag !== "邀请注册"));
+  const tags = Array.isArray(user.identityTags) && user.identityTags.length
+    ? user.identityTags
+    : Array.isArray(user.tags) ? user.tags : [];
+  return [...new Set(tags
+    .map((tag) => String(tag || "").trim())
+    .filter((tag) => TRUST_IDENTITY_TAGS.has(tag)))]
+    .slice(0, 6);
 }
 
 function selectIdentityTag(user = {}, requested = "") {
   const allowed = allowedIdentityTags(user);
   if (requested && allowed.includes(requested)) return requested;
-  return allowed[0] || "同学";
+  return "";
 }
 
 function publicAuthUser(user = null) {
@@ -262,7 +280,7 @@ function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
 function verifyPassword(password, user) {
   if (!user?.password?.salt || !user?.password?.hash) return false;
   const next = hashPassword(password, user.password.salt).hash;
-  return crypto.timingSafeEqual(Buffer.from(next, "hex"), Buffer.from(user.password.hash, "hex"));
+  return crypto.timingSafeEqual(Buffer.from(next, "hex"), Buffer.from(user.password.hash));
 }
 
 function parseCookies(req) {
