@@ -1,0 +1,57 @@
+name: Backend Verify
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: backend-verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Run backend verification matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      LIAN_STORAGE_MODE: db
+      LIAN_REDIS_OBJECT_READS: "true"
+      LIAN_REDIS_OBJECT_PRIMARY: "true"
+      LIAN_AUTH_OBJECT_READS: "true"
+      LIAN_AUTH_OBJECT_NATIVE: "true"
+      LIAN_REDIS_HOST: 127.0.0.1
+      LIAN_REDIS_PORT: "6379"
+      LIAN_REDIS_DB: "2"
+      LIAN_REDIS_PREFIX: lian:
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify backend contracts
+        run: npm run verify
