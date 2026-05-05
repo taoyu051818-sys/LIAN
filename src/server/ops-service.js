@@ -21,22 +21,6 @@ const frontendRepoDir = process.env.LIAN_FRONTEND_REPO_DIR || "/opt/lian-mobile-
 const frontendServiceName = process.env.LIAN_FRONTEND_SERVICE || "lian-frontend.service";
 const backendPm2Name = process.env.LIAN_BACKEND_PM2_NAME || "lian-platform-server";
 
-const OPS_ACTIONS = new Set([
-  "restart-frontend",
-  "restart-backend",
-  "restart-all",
-  "update-frontend",
-  "update-backend",
-  "update-all",
-  "set-security-development",
-  "set-security-production"
-]);
-
-const DEPLOY_REPO_ACTIONS = new Map([
-  ["taoyu051818-sys/lian-mobile-web", "update-frontend"],
-  ["taoyu051818-sys/lian-platform-server", "update-backend"]
-]);
-
 function configuredOpsAdminUsers() {
   return String(process.env.LIAN_OPS_ADMIN_USERS || process.env.OPS_ADMIN_USERS || "")
     .split(",")
@@ -163,17 +147,6 @@ function parseJson(text = "") {
   }
 }
 
-function imageDeliverySummary(feedText = "") {
-  const proxyMatches = feedText.match(/https:\/\/lian\.nat100\.top\/api\/image-proxy/g) || [];
-  const cloudinaryMatches = feedText.match(/https:\/\/res\.cloudinary\.com[^"'\\\s<>)]+/g) || [];
-  return {
-    usesLianImageProxy: proxyMatches.length > 0,
-    lianImageProxyCount: proxyMatches.length,
-    cloudinaryDirectCount: cloudinaryMatches.length,
-    sampleCloudinaryUrls: [...new Set(cloudinaryMatches)].slice(0, 5)
-  };
-}
-
 async function readGitInfo() {
   try {
     const head = (await fs.readFile(path.join(repoRoot, ".git/HEAD"), "utf8")).trim();
@@ -197,10 +170,10 @@ async function readGitInfo() {
 
 function frontendRestartScript() {
   return `
-systemctl restart lian-frontend.service
+systemctl restart ${shellQuote(frontendServiceName)}
 sleep 2
-systemctl status lian-frontend.service --no-pager -l || true
-journalctl -u lian-frontend.service -n 40 --no-pager || true
+systemctl status ${shellQuote(frontendServiceName)} --no-pager -l || true
+journalctl -u ${shellQuote(frontendServiceName)} -n 40 --no-pager || true
 `;
 }
 
@@ -253,16 +226,16 @@ function securityModeUpdateScript(mode) {
     })};`,
     'let text = "";',
     'try { text = fs.readFileSync(envPath, "utf8"); } catch {}',
-    'const lines = text.split(/\\\\r?\\\\n/).filter((line, index, arr) => index < arr.length - 1 || line);',
+    'const lines = text.split(/\\r?\\n/).filter((line, index, arr) => index < arr.length - 1 || line);',
     'for (const [key, value] of Object.entries(updates)) {',
     '  const next = `${key}="${value}"`;',
     '  const index = lines.findIndex((line) => line.trim().startsWith(`${key}=`));',
     '  if (index >= 0) lines[index] = next;',
     '  else lines.push(next);',
     '}',
-    'fs.writeFileSync(envPath, `${lines.join("\\\\n")}\\\\n`);',
+    'fs.writeFileSync(envPath, `${lines.join("\\n")}\\n`);',
     'console.log(`[LIAN ops] security mode set to ${updates.LIAN_SECURITY_MODE} in ${envPath}`);'
-  ].join("\\n");
+  ].join("\n");
 
   return `
 cd ${shellQuote(backendRepoDir)}
@@ -276,31 +249,77 @@ pm2 list
 `;
 }
 
-function scriptForAction(action) {
-  switch (action) {
-    case "restart-frontend":
-      return frontendRestartScript();
-    case "restart-backend":
-      return backendRestartScript();
-    case "restart-all":
-      return `${frontendRestartScript()}\n${backendRestartScript()}`;
-    case "update-frontend":
-      return frontendUpdateScript();
-    case "update-backend":
-      return backendUpdateScript();
-    case "update-all":
-      return `${frontendUpdateScript()}\n${backendUpdateScript()}`;
-    case "set-security-development":
-      return securityModeUpdateScript("development");
-    case "set-security-production":
-      return securityModeUpdateScript("production");
-    default:
-      return "";
+const OPS_ACTION_DEFINITIONS = Object.freeze([
+  {
+    action: "restart-frontend",
+    label: "Restart frontend",
+    script: frontendRestartScript
+  },
+  {
+    action: "restart-backend",
+    label: "Restart backend",
+    script: backendRestartScript
+  },
+  {
+    action: "restart-all",
+    label: "Restart frontend and backend",
+    script: () => `${frontendRestartScript()}\n${backendRestartScript()}`
+  },
+  {
+    action: "update-frontend",
+    label: "Update and restart frontend",
+    deployRepositories: ["taoyu051818-sys/lian-mobile-web"],
+    script: frontendUpdateScript
+  },
+  {
+    action: "update-backend",
+    label: "Update and restart backend",
+    deployRepositories: ["taoyu051818-sys/lian-platform-server"],
+    script: backendUpdateScript
+  },
+  {
+    action: "update-all",
+    label: "Update and restart frontend and backend",
+    script: () => `${frontendUpdateScript()}\n${backendUpdateScript()}`
+  },
+  {
+    action: "set-security-development",
+    label: "Set backend security mode to development",
+    script: () => securityModeUpdateScript("development")
+  },
+  {
+    action: "set-security-production",
+    label: "Set backend security mode to production",
+    script: () => securityModeUpdateScript("production")
   }
+]);
+
+function buildOpsActionMap(definitions) {
+  const map = new Map();
+  for (const definition of definitions) {
+    if (map.has(definition.action)) throw new Error(`duplicate ops action: ${definition.action}`);
+    map.set(definition.action, definition);
+  }
+  return map;
 }
 
+function buildDeployRepoActions(definitions) {
+  const map = new Map();
+  for (const definition of definitions) {
+    for (const repository of definition.deployRepositories || []) {
+      if (map.has(repository)) throw new Error(`duplicate deploy repository action: ${repository}`);
+      map.set(repository, definition.action);
+    }
+  }
+  return map;
+}
+
+const OPS_ACTION_MAP = buildOpsActionMap(OPS_ACTION_DEFINITIONS);
+const DEPLOY_REPO_ACTIONS = buildDeployRepoActions(OPS_ACTION_DEFINITIONS);
+
 function scheduleOpsAction(action, source = "manual") {
-  if (!OPS_ACTIONS.has(action)) {
+  const definition = OPS_ACTION_MAP.get(action);
+  if (!definition) {
     const error = new Error("unsupported ops action");
     error.status = 400;
     throw error;
@@ -313,7 +332,7 @@ set -euo pipefail
   echo "[LIAN ops] action=${action}"
   echo "[LIAN ops] started_at=$(date -Iseconds)"
   sleep 1
-  ${scriptForAction(action)}
+  ${definition.script()}
   echo "[LIAN ops] finished_at=$(date -Iseconds)"
 } > ${shellQuote(logPath)} 2>&1
 `;
@@ -418,7 +437,12 @@ async function handleOpsHealth(req, reqUrl, res) {
       frontendServiceName,
       backendPm2Name,
       deployWebhookConfigured: Boolean(DEPLOY_WEBHOOK_SECRET),
-      opsAdminUsersConfigured: configuredOpsAdminUsers().length > 0
+      opsAdminUsersConfigured: configuredOpsAdminUsers().length > 0,
+      opsActions: OPS_ACTION_DEFINITIONS.map(({ action, label, deployRepositories = [] }) => ({
+        action,
+        label,
+        deployRepositories
+      }))
     },
     checks
   });
