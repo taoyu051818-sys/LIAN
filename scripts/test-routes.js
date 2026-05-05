@@ -30,6 +30,9 @@ console.log("▶ 精确匹配");
 
 assert(matchRoute("GET", "/api/setup/status"), { routeId: "setup-status", params: {} }, "GET /api/setup/status");
 assert(matchRoute("POST", "/api/setup"), { routeId: "setup", params: {} }, "POST /api/setup");
+assert(matchRoute("GET", "/api/ops/health"), { routeId: "ops-health", params: {} }, "GET /api/ops/health");
+assert(matchRoute("POST", "/api/ops/action"), { routeId: "ops-action", params: {} }, "POST /api/ops/action");
+assert(matchRoute("POST", "/api/ops/deploy-webhook"), { routeId: "ops-deploy-webhook", params: {} }, "POST /api/ops/deploy-webhook");
 assert(matchRoute("GET", "/api/internal/task-board"), { routeId: "internal-task-board", params: {} }, "GET /api/internal/task-board");
 assert(matchRoute("GET", "/api/alias-pool"), { routeId: "alias-pool", params: {} }, "GET /api/alias-pool");
 assert(matchRoute("POST", "/api/ai/post-preview"), { routeId: "ai-post-preview", params: {} }, "POST /api/ai/post-preview");
@@ -106,6 +109,9 @@ console.log("");
 console.log("▶ 方法不匹配");
 
 assertNull(matchRoute("POST", "/api/internal/task-board"), "POST /api/internal/task-board → null (GET only)");
+assertNull(matchRoute("POST", "/api/ops/health"), "POST /api/ops/health → null (GET only)");
+assertNull(matchRoute("GET", "/api/ops/action"), "GET /api/ops/action → null (POST only)");
+assertNull(matchRoute("GET", "/api/ops/deploy-webhook"), "GET /api/ops/deploy-webhook → null (POST only)");
 assertNull(matchRoute("GET", "/api/auth/login"), "GET /api/auth/login → null (POST only)");
 assertNull(matchRoute("GET", "/api/auth/register"), "GET /api/auth/register → null (POST only)");
 assertNull(matchRoute("POST", "/api/feed-debug"), "POST /api/feed-debug → null (GET only)");
