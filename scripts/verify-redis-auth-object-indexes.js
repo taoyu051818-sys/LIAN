@@ -1,107 +1,102 @@
-import assert from "node:assert/strict";
+import crypto from "node:crypto";
 
 import {
   closeRedisClient,
-  redisConfig
+  getRedisClient,
+  redisConfig,
+  redisKey
 } from "../src/server/storage/redis-client.js";
-import {
-  readRedisObjectAuthInvite,
-  readRedisObjectAuthSession,
-  readRedisObjectAuthUserById,
-  readRedisObjectAuthUserByLogin,
-  readRedisObjectAuthVerification
-} from "../src/server/storage/redis-object-store.js";
-import { KEYS, readJsonKey } from "../src/server/storage/redis-store.js";
 
-function normalizeLogin(value = "") {
+function stableId(value, fallback = "") {
+  const raw = String(value || fallback || "").trim();
+  if (raw) return raw.replace(/[^a-zA-Z0-9:_@.-]/g, "_").slice(0, 160);
+  return crypto.createHash("sha256").update(JSON.stringify(value ?? fallback)).digest("hex");
+}
+
+function normalizeIndexValue(value = "") {
   return String(value || "").trim().toLowerCase();
 }
 
-function redact(value = "") {
-  const raw = String(value || "");
-  if (raw.length <= 8) return "***";
-  return `${raw.slice(0, 3)}...${raw.slice(-3)}`;
+function parseJson(raw, fallback = null) {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
 }
 
-async function verifyUsers(store) {
-  const users = Array.isArray(store.users) ? store.users : [];
-  let byId = 0;
-  let byEmail = 0;
-  let byUsername = 0;
-
-  for (const user of users) {
-    const id = user.id || user.userId || user.uid || user.email || user.username;
-    const objectUser = await readRedisObjectAuthUserById(id);
-    assert.deepEqual(objectUser, user, `auth user id lookup mismatch for ${id}`);
-    byId += 1;
-
-    if (user.email) {
-      const emailUser = await readRedisObjectAuthUserByLogin(normalizeLogin(user.email));
-      assert.deepEqual(emailUser, user, `auth user email lookup mismatch for ${redact(user.email)}`);
-      byEmail += 1;
-    }
-
-    if (user.username) {
-      const usernameUser = await readRedisObjectAuthUserByLogin(user.username.toUpperCase());
-      assert.deepEqual(usernameUser, user, `auth user username lookup mismatch for ${user.username}`);
-      byUsername += 1;
-    }
-  }
-
-  console.log(`[ok] auth users: id=${byId} email=${byEmail} username=${byUsername}`);
+async function getJson(client, key, fallback = null) {
+  return parseJson(await client.get(redisKey(key)), fallback);
 }
 
-async function verifySessions(store) {
-  const sessions = store.sessions && typeof store.sessions === "object" ? store.sessions : {};
-  let count = 0;
-  for (const [token, session] of Object.entries(sessions)) {
-    const objectSession = await readRedisObjectAuthSession(token);
-    assert.ok(objectSession, `auth session lookup failed for token ${redact(token)}`);
-    assert.equal(objectSession.userId, session.userId, `auth session userId mismatch for token ${redact(token)}`);
-    assert.equal(objectSession.expiresAt, session.expiresAt, `auth session expiresAt mismatch for token ${redact(token)}`);
-    assert.ok(objectSession.tokenHash, `auth session tokenHash missing for token ${redact(token)}`);
-    assert.equal(JSON.stringify(objectSession).includes(token), false, `auth session stores raw token for ${redact(token)}`);
-    count += 1;
-  }
-  console.log(`[ok] auth sessions: ${count}`);
-}
-
-async function verifyInvites(store) {
-  const invites = store.invites && typeof store.invites === "object" ? store.invites : {};
-  let count = 0;
-  for (const [code, invite] of Object.entries(invites)) {
-    const objectInvite = await readRedisObjectAuthInvite(code);
-    assert.deepEqual(objectInvite, { code, ...invite }, `auth invite lookup mismatch for ${redact(code)}`);
-    count += 1;
-  }
-  console.log(`[ok] auth invites: ${count}`);
-}
-
-async function verifyVerifications(store) {
-  const verifications = store.verifications && typeof store.verifications === "object" ? store.verifications : {};
-  let count = 0;
-  for (const [key, verification] of Object.entries(verifications)) {
-    const objectVerification = await readRedisObjectAuthVerification(key);
-    assert.deepEqual(objectVerification, { key, ...verification }, `auth verification lookup mismatch for ${redact(key)}`);
-    count += 1;
-  }
-  console.log(`[ok] auth verifications: ${count}`);
+function fail(message) {
+  throw new Error(message);
 }
 
 async function main() {
   console.log(`[verify:redis:auth] redis ${redisConfig.host}:${redisConfig.port} db=${redisConfig.database} prefix=${redisConfig.keyPrefix}`);
+
   if (redisConfig.database === 1) {
-    throw new Error("Refusing to verify auth object indexes in Redis DB 1 because NodeBB uses DB 1 on this server.");
+    fail("Refusing to verify LIAN auth data in Redis DB 1 because NodeBB uses DB 1 on this server.");
   }
 
-  const store = await readJsonKey(KEYS.authStore, { users: [], sessions: {}, invites: {}, verifications: {} });
+  const client = await getRedisClient();
 
-  await verifyUsers(store);
-  await verifySessions(store);
-  await verifyInvites(store);
-  await verifyVerifications(store);
+  const userIds = (await client.sMembers(redisKey("auth:user:ids"))).sort();
+  const sessionIds = (await client.sMembers(redisKey("auth:sessions"))).sort();
+  const inviteIds = (await client.sMembers(redisKey("auth:invites"))).sort();
+  const verificationIds = (await client.sMembers(redisKey("auth:verifications"))).sort();
 
-  console.log("[verify:redis:auth] auth object indexes verified");
+  const counts = {
+    users: userIds.length,
+    sessions: sessionIds.length,
+    invites: inviteIds.length,
+    verifications: verificationIds.length
+  };
+
+  console.log(JSON.stringify(counts, null, 2));
+
+  if (userIds.length < 1) fail("auth:user:ids is empty");
+
+  for (const id of userIds) {
+    const user = await getJson(client, `auth:user:${id}`, null);
+    if (!user) fail(`missing auth:user:${id}`);
+
+    if (user.email) {
+      const emailKey = stableId(normalizeIndexValue(user.email));
+      const indexedId = await client.get(redisKey(`auth:email:${emailKey}`));
+      if (indexedId !== id) fail(`email index mismatch for ${user.email}: expected ${id}, got ${indexedId}`);
+    }
+
+    if (user.username) {
+      const usernameKey = stableId(normalizeIndexValue(user.username));
+      const indexedId = await client.get(redisKey(`auth:username:${usernameKey}`));
+      if (indexedId !== id) fail(`username index mismatch for ${user.username}: expected ${id}, got ${indexedId}`);
+    }
+  }
+
+  for (const hash of sessionIds) {
+    const session = await getJson(client, `auth:session:${hash}`, null);
+    if (!session) fail(`missing auth:session:${hash}`);
+    if (!session.userId) fail(`auth:session:${hash} missing userId`);
+    const user = await getJson(client, `auth:user:${stableId(session.userId)}`, null);
+    if (!user) fail(`auth:session:${hash} points to missing user ${session.userId}`);
+  }
+
+  for (const code of inviteIds) {
+    const invite = await getJson(client, `auth:invite:${code}`, null);
+    if (!invite) fail(`missing auth:invite:${code}`);
+    if (!invite.code) fail(`auth:invite:${code} missing code`);
+  }
+
+  for (const key of verificationIds) {
+    const verification = await getJson(client, `auth:verification:${key}`, null);
+    if (!verification) fail(`missing auth:verification:${key}`);
+    if (!verification.email && !verification.key) fail(`auth:verification:${key} missing email/key`);
+  }
+
+  console.log("[verify:redis:auth] auth object-native indexes verified");
 }
 
 main().catch((error) => {
