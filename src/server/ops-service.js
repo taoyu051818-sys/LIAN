@@ -6,12 +6,11 @@ import { fileURLToPath } from "node:url";
 
 import { config, isSetupRequired } from "./config.js";
 import { sendJson } from "./http-response.js";
+import { normalizePublicBaseUrl, runPublicEntryChecks } from "./public-entry-checks.js";
 import { requireAdmin } from "./request-utils.js";
 import { getCurrentUser } from "./auth-service.js";
 import { securityModeName } from "./security-mode.js";
 
-const DEFAULT_PUBLIC_BASE_URL = "https://lian.nat100.top";
-const REQUEST_TIMEOUT_MS = 8000;
 const MAX_WEBHOOK_BYTES = 1024 * 1024;
 const OPS_LOG_DIR = process.env.LIAN_OPS_LOG_DIR || "/tmp";
 const DEPLOY_WEBHOOK_SECRET = process.env.LIAN_DEPLOY_WEBHOOK_SECRET || "";
@@ -61,16 +60,6 @@ async function requireOpsAdmin(req) {
   return auth;
 }
 
-function normalizeBaseUrl(value = "") {
-  const raw = String(value || "").trim() || DEFAULT_PUBLIC_BASE_URL;
-  const url = new URL(raw);
-  if (!["http:", "https:"].includes(url.protocol)) throw new Error("publicBase must be http or https");
-  url.pathname = "";
-  url.search = "";
-  url.hash = "";
-  return url.toString().replace(/\/$/, "");
-}
-
 function shellQuote(value = "") {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
 }
@@ -105,45 +94,6 @@ function verifyGithubSignature(rawBody, signatureHeader = "") {
     const error = new Error("invalid GitHub webhook signature");
     error.status = 401;
     throw error;
-  }
-}
-
-async function fetchText(url, { method = "GET" } = {}) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  const startedAt = Date.now();
-  try {
-    const response = await fetch(url, {
-      method,
-      signal: controller.signal,
-      headers: { accept: "application/json,text/html,text/plain,*/*" }
-    });
-    const text = await response.text();
-    return {
-      ok: response.ok,
-      status: response.status,
-      elapsedMs: Date.now() - startedAt,
-      contentType: response.headers.get("content-type") || "",
-      body: text
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function safeCheck(name, run) {
-  try {
-    return { name, ok: true, ...(await run()) };
-  } catch (error) {
-    return { name, ok: false, error: error?.message || String(error) };
-  }
-}
-
-function parseJson(text = "") {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
   }
 }
 
@@ -347,75 +297,13 @@ set -euo pipefail
 async function handleOpsHealth(req, reqUrl, res) {
   await requireOpsAdmin(req);
 
-  const publicBaseUrl = normalizeBaseUrl(reqUrl.searchParams.get("publicBase") || reqUrl.searchParams.get("base") || "");
-  const checks = [];
-
-  checks.push(await safeCheck("frontend-home", async () => {
-    const result = await fetchText(`${publicBaseUrl}/`);
-    return {
-      status: result.status,
-      elapsedMs: result.elapsedMs,
-      contentType: result.contentType,
-      hasHtml: /<html|<!doctype html/i.test(result.body)
-    };
-  }));
-
-  checks.push(await safeCheck("ops-page", async () => {
-    const result = await fetchText(`${publicBaseUrl}/ops.html`);
-    return {
-      status: result.status,
-      elapsedMs: result.elapsedMs,
-      contentType: result.contentType,
-      hasOpsHtml: /LIAN Ops|ops-card/i.test(result.body)
-    };
-  }));
-
-  checks.push(await safeCheck("setup-status", async () => {
-    const result = await fetchText(`${publicBaseUrl}/api/setup/status`);
-    const json = parseJson(result.body);
-    return {
-      status: result.status,
-      elapsedMs: result.elapsedMs,
-      contentType: result.contentType,
-      jsonValid: Boolean(json),
-      securityMode: json?.securityMode || null
-    };
-  }));
-
-  checks.push(await safeCheck("api-feed", async () => {
-    const result = await fetchText(`${publicBaseUrl}/api/feed`);
-    const json = parseJson(result.body);
-    return {
-      status: result.status,
-      elapsedMs: result.elapsedMs,
-      contentType: result.contentType,
-      jsonValid: Boolean(json),
-      itemCount: Array.isArray(json?.items) ? json.items.length : null
-    };
-  }));
-
-  checks.push(await safeCheck("map-v2-items", async () => {
-    const result = await fetchText(`${publicBaseUrl}/api/map/v2/items`);
-    const json = parseJson(result.body);
-    return {
-      status: result.status,
-      elapsedMs: result.elapsedMs,
-      contentType: result.contentType,
-      jsonValid: Boolean(json),
-      itemCount: Array.isArray(json?.items) ? json.items.length : null
-    };
-  }));
-
-  const ok = checks.every((check) =>
-    check.ok &&
-    (!check.status || (check.status >= 200 && check.status < 300)) &&
-    check.jsonValid !== false
-  );
+  const publicBaseUrl = normalizePublicBaseUrl(reqUrl.searchParams.get("publicBase") || reqUrl.searchParams.get("base") || "");
+  const publicEntry = await runPublicEntryChecks({ baseUrl: publicBaseUrl, includeOpsPage: true });
 
   sendJson(res, 200, {
-    ok,
+    ok: publicEntry.ok,
     generatedAt: new Date().toISOString(),
-    publicBaseUrl,
+    publicBaseUrl: publicEntry.baseUrl,
     service: {
       pid: process.pid,
       cwd: process.cwd(),
@@ -444,7 +332,7 @@ async function handleOpsHealth(req, reqUrl, res) {
         deployRepositories
       }))
     },
-    checks
+    checks: publicEntry.results
   });
 }
 
