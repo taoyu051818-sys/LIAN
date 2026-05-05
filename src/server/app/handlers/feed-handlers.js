@@ -32,12 +32,19 @@ function normalizeTabs(tabs = []) {
     .filter(Boolean);
 }
 
+function normalizePrimaryTag(tags = [], metadata = {}) {
+  const fromMetadata = String(metadata.primaryTag || metadata.tag || "").trim();
+  if (fromMetadata) return fromMetadata.replace(/^#+/, "#");
+  const first = String(tags[0] || "").trim();
+  return first ? (first.startsWith("#") ? first : `#${first}`) : "";
+}
+
 function normalizeTopicForDomain(topic = {}, metadata = {}) {
   const tid = Number(topic.tid || topic.topic?.tid || 0) || 0;
   const post = topic.posts?.[0] || topic.teaser || {};
   const contentHtml = post.content || topic.content || "";
   const tags = Array.isArray(topic.tags) ? topic.tags : [];
-  const tagValues = tags.map((item) => item.value || item.name || item).filter(Boolean);
+  const tagValues = tags.map((item) => item.value || item.name || item).filter(Boolean).slice(0, 1);
   const imageUrls = Array.isArray(metadata.imageUrls)
     ? metadata.imageUrls.map((url) => normalizePostImageUrl(url, { width: 900 })).filter(Boolean)
     : [];
@@ -53,7 +60,7 @@ function normalizeTopicForDomain(topic = {}, metadata = {}) {
     cover,
     imageUrls,
     tags: tagValues,
-    primaryTag: tagValues[0] || "",
+    primaryTag: normalizePrimaryTag(tagValues, metadata),
     timestampISO: topic.timestampISO || post.timestampISO || "",
     timeLabel: metadata.timeLabel || "",
     contentType: metadata.contentType || "general",
@@ -75,11 +82,12 @@ function toFeedItemDto(item = {}) {
     title: String(item.title || "未命名"),
     bodyPreview: String(item.bodyPreview || ""),
     cover: String(item.cover || ""),
+    primaryTag: String(item.primaryTag || ""),
     author: {
       nodebbUid: normalizeNodebbUid(author.nodebbUid),
       displayName: String(author.displayName || "同学"),
       avatarUrl: String(author.avatarUrl || ""),
-      identityTag: String(author.identityTag || "校园身份"),
+      identityTag: String(author.identityTag || ""),
       source: String(author.source || "fallback")
     },
     timeLabel: String(item.timeLabel || ""),
@@ -188,7 +196,7 @@ async function handleFeedRefactored(req, reqUrl, res) {
     const result = await usecase.execute({ actor: auth.user, page, context: "feed" });
     let items = result.items;
     if (tab && !["此刻", "精选"].includes(tab)) {
-      items = items.filter((item) => item.tags.includes(tab) || item.primaryTag === tab);
+      items = items.filter((item) => item.tags.includes(tab) || item.primaryTag === tab || item.primaryTag === `#${tab}`);
     }
     const start = (page - 1) * limit;
     const selected = await applyAuthorDtos(items.slice(start, start + limit), nodebb.users);
