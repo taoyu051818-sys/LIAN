@@ -19,7 +19,7 @@ async function loadEnv() {
       const m = line.match(/^([^#=]+)=(.*)$/);
       if (m) {
         const key = m[1].trim();
-        let val = m[2].trim().replace(/^["']|["']$/g, "");
+        const val = m[2].trim().replace(/^["']|["']$/g, "");
         if (!process.env[key]) process.env[key] = val;
       }
     }
@@ -27,9 +27,14 @@ async function loadEnv() {
 }
 await loadEnv();
 
-const BASE = (process.env.NODEBB_BASE_URL || "http://149.104.21.74:4567").replace(/\/$/, "");
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const BASE = (process.env.NODEBB_BASE_URL || "http://149.104.21.74:4567").replace(/\/+$/, "");
 const TOKEN = process.env.NODEBB_API_TOKEN || "";
-const DEFAULT_UID = Number(process.env.NODEBB_UID || 2);
+const DEFAULT_UID = parsePositiveInteger(process.env.NODEBB_UID, 2);
 const WRITE_MODE = process.env.NODEBB_SMOKE_WRITE === "1";
 
 let passed = 0, failed = 0;
