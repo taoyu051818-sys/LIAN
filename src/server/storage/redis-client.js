@@ -4,6 +4,10 @@ function clean(value = "") {
   return String(value || "").trim();
 }
 
+function envFlag(value = "") {
+  return ["1", "true", "yes", "on"].includes(clean(value).toLowerCase());
+}
+
 const redisConfig = {
   driver: clean(process.env.LIAN_DB_DRIVER || ""),
   host: clean(process.env.LIAN_REDIS_HOST || "127.0.0.1"),
@@ -12,11 +16,16 @@ const redisConfig = {
   database: Number(process.env.LIAN_REDIS_DB || 2),
   keyPrefix: clean(process.env.LIAN_REDIS_KEY_PREFIX || "lian:"),
   storageMode: clean(process.env.LIAN_STORAGE_MODE || "file").toLowerCase(),
-  allowFileFallback: clean(process.env.LIAN_STORAGE_MIGRATION_ALLOW_FILE_FALLBACK || "false").toLowerCase() === "true"
+  allowFileFallback: envFlag(process.env.LIAN_STORAGE_MIGRATION_ALLOW_FILE_FALLBACK || "false"),
+  objectReads: envFlag(process.env.LIAN_REDIS_OBJECT_READS || "false")
 };
 
 function isRedisStorageEnabled() {
   return redisConfig.storageMode === "db" || redisConfig.storageMode === "redis";
+}
+
+function areRedisObjectReadsEnabled() {
+  return isRedisStorageEnabled() && redisConfig.objectReads;
 }
 
 let clientPromise = null;
@@ -59,4 +68,4 @@ async function closeRedisClient() {
   await client.quit();
 }
 
-export { closeRedisClient, getRedisClient, isRedisStorageEnabled, redisConfig, redisKey };
+export { areRedisObjectReadsEnabled, closeRedisClient, getRedisClient, isRedisStorageEnabled, redisConfig, redisKey };
