@@ -2,6 +2,10 @@ function extractUserCollectionTopics(data = {}) {
   if (Array.isArray(data?.topics)) return data.topics;
   if (Array.isArray(data?.posts)) return data.posts;
   if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.payload?.topics)) return data.payload.topics;
+  if (Array.isArray(data?.payload?.posts)) return data.payload.posts;
+  if (Array.isArray(data?.response?.topics)) return data.response.topics;
+  if (Array.isArray(data?.response?.posts)) return data.response.posts;
   if (Array.isArray(data)) return data;
   return [];
 }
