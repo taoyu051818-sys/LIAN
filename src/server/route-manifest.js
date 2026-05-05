@@ -14,6 +14,7 @@ const GATE_PROTECTED_PREFIXES = [
 const GATE_PUBLIC_EXACT_PATHS = [
   { method: "GET", path: "/api/setup/status", reason: "setup and mode status" },
   { method: "GET", path: "/api/ops/routes", reason: "route capability manifest for edge/gate proxy" },
+  { method: "GET", path: "/api/identity/actors", reason: "public actor display identity resolver for feed and content surfaces" },
   { method: "GET", path: "/api/feed", reason: "public home feed" },
   { method: "GET", path: "/api/feed-debug", reason: "development feed diagnostics" },
   { method: "GET", path: "/api/tags", reason: "public tag list" },
