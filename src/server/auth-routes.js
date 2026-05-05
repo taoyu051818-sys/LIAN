@@ -2,6 +2,8 @@ import crypto from "node:crypto";
 
 import { config } from "./config.js";
 import { loadAuthStore, saveAuthStore } from "./data-store.js";
+import { loadAliasPool } from "./alias-service.js";
+import { chooseAliasPoolIdForInterests, normalizeInterestIds, publicInterestCatalog } from "./interest-service.js";
 import { sendJson } from "./http-response.js";
 import { nodebbFetch } from "./nodebb-client.js";
 import { checkRateLimit } from "./rate-limit.js";
@@ -41,6 +43,34 @@ function authObjectNativeEnabled() {
   return String(process.env.LIAN_AUTH_OBJECT_NATIVE || "").toLowerCase() === "true";
 }
 
+function aliasFromPoolEntry(entry) {
+  if (!entry) return null;
+  return {
+    id: crypto.randomUUID(),
+    poolId: entry.id,
+    name: entry.name,
+    avatarUrl: entry.avatarUrl || "",
+    avatarSeed: entry.avatarSeed || "",
+    category: entry.category || "",
+    categoryLabel: entry.categoryLabel || "",
+    createdAt: new Date().toISOString(),
+    status: "active"
+  };
+}
+
+async function attachInitialAliasForInterests(user, users = []) {
+  if (Array.isArray(user.aliases) && user.aliases.length) return user;
+  const pool = await loadAliasPool();
+  const poolId = chooseAliasPoolIdForInterests(pool, user.interests || [], users);
+  const entry = pool.find((item) => item.id === poolId) || pool[0] || null;
+  const alias = aliasFromPoolEntry(entry);
+  if (!alias) return user;
+  user.aliases = [alias];
+  user.activeAliasId = alias.id;
+  user.aliasGrantedAt = alias.createdAt;
+  user.aliasGrantReason = "registration_interests";
+  return user;
+}
 
 async function handleAuthRules(res) {
   sendJson(res, 200, {
@@ -48,7 +78,8 @@ async function handleAuthRules(res) {
       name: item.name,
       tags: item.tags,
       domains: item.domains
-    }))
+    })),
+    interests: publicInterestCatalog()
   });
 }
 
@@ -140,7 +171,6 @@ async function handleSendEmailCode(req, res) {
   sendJson(res, 200, { ok: true, expiresInSeconds: 600, institution: institution.name });
 }
 
-
 function isVerificationRecordValid(record, email, code) {
   if (!record) return false;
   if (Date.now() > Date.parse(record.expiresAt || 0)) return false;
@@ -154,8 +184,8 @@ async function handleAuthRegisterObjectNative(req, res, payload) {
   const password = String(payload.password || "");
   const inviteCode = String(payload.inviteCode || "").trim().toUpperCase();
   const emailCode = String(payload.emailCode || "").trim();
+  const interests = normalizeInterestIds(payload.interests);
 
-  if (authObjectNativeEnabled()) return await handleAuthRegisterObjectNative(req, res, payload);
   if (!username) return sendJson(res, 400, { error: "username is required" });
   if (password.length < 8) return sendJson(res, 400, { error: "password must be at least 8 characters" });
   if (await readRedisObjectAuthUserByLogin(username)) return sendJson(res, 409, { error: "username already registered" });
@@ -190,12 +220,14 @@ async function handleAuthRegisterObjectNative(req, res, payload) {
     password: hashPassword(password),
     institution: institution?.name || "",
     tags,
+    interests,
     status: "active",
     registerMethod,
     invitePermission,
     invitedBy,
     createdAt: new Date().toISOString()
   };
+  await attachInitialAliasForInterests(user, []);
 
   const token = crypto.randomBytes(32).toString("base64url");
   await writeRedisObjectAuthUser(user);
@@ -211,11 +243,14 @@ async function handleAuthRegisterObjectNative(req, res, payload) {
 
 async function handleAuthRegister(req, res) {
   const payload = await readJsonBody(req);
+  if (authObjectNativeEnabled()) return await handleAuthRegisterObjectNative(req, res, payload);
+
   const email = String(payload.email || "").trim().toLowerCase();
   const username = String(payload.username || "").trim().slice(0, 30);
   const password = String(payload.password || "");
   const inviteCode = String(payload.inviteCode || "").trim().toUpperCase();
   const emailCode = String(payload.emailCode || "").trim();
+  const interests = normalizeInterestIds(payload.interests);
   try {
     checkRateLimit(req, "register-ip", "global", { max: 8, windowMs: 10 * 60_000 });
     checkRateLimit(req, "register-target", email || username || inviteCode || "missing", { max: 6, windowMs: 10 * 60_000 });
@@ -258,12 +293,14 @@ async function handleAuthRegister(req, res) {
     password: hashPassword(password),
     institution: institution?.name || "",
     tags,
+    interests,
     status: "active",
     registerMethod,
     invitePermission,
     invitedBy,
     createdAt: new Date().toISOString()
   };
+  await attachInitialAliasForInterests(user, store.users);
   store.users.push(user);
   const token = crypto.randomBytes(32).toString("base64url");
   store.sessions[token] = {
@@ -361,6 +398,7 @@ function upsertRemoteAuthUser(store, remoteUser = {}, login = "") {
       password: hashPassword(crypto.randomBytes(24).toString("base64url")),
       institution: "",
       tags: ["远端账号"],
+      interests: [],
       status: "active",
       registerMethod: "remote",
       invitePermission: false,
@@ -378,12 +416,12 @@ function upsertRemoteAuthUser(store, remoteUser = {}, login = "") {
   user.nodebbUid = remoteUser.nodebbUid || remoteUser.uid || user.nodebbUid || null;
   user.institution = remoteUser.institution || user.institution || "";
   user.tags = Array.isArray(remoteUser.tags) && remoteUser.tags.length ? remoteUser.tags : (user.tags || ["远端账号"]);
+  user.interests = normalizeInterestIds(remoteUser.interests || user.interests || []);
   user.status = remoteUser.status || user.status || "active";
   user.registerMethod = "remote";
   user.remoteSyncedAt = new Date().toISOString();
   return user;
 }
-
 
 async function handleAuthLoginObjectNative(req, res, payload, login, password) {
   const user = await readRedisObjectAuthUserByLogin(login);
