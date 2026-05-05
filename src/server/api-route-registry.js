@@ -24,6 +24,7 @@ import { handleMapV2Items } from "./map-v2-service.js";
 import { handleMessages } from "./notification-service.js";
 import { nodebbFetch } from "./nodebb-client.js";
 import { handleOpsAction, handleOpsDeployWebhook, handleOpsHealth } from "./ops-service.js";
+import { handleOpsObservability } from "./ops-observability-route.js";
 import {
   handleFeedDebugRefactored as handleFeedDebug,
   handleFeedRefactored as handleFeed,
@@ -50,6 +51,7 @@ const PRE_SETUP_ROUTE_IDS = new Set([
   "setup-status",
   "setup",
   "ops-health",
+  "ops-observability",
   "ops-routes",
   "ops-action",
   "ops-deploy-webhook",
@@ -101,6 +103,7 @@ const ROUTE_HANDLERS = {
   "setup-status": ({ res }) => sendJson(res, 200, setupStatusPayload()),
   setup: handleSetup,
   "ops-health": ({ req, reqUrl, res }) => handleOpsHealth(req, reqUrl, res),
+  "ops-observability": ({ req, reqUrl, res }) => handleOpsObservability(req, reqUrl, res),
   "ops-routes": ({ res }) => sendJson(res, 200, buildRouteManifest()),
   "ops-action": ({ req, reqUrl, res }) => handleOpsAction(req, reqUrl, res),
   "ops-deploy-webhook": ({ req, reqUrl, res }) => handleOpsDeployWebhook(req, reqUrl, res),
