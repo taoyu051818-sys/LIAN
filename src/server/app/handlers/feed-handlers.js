@@ -9,66 +9,115 @@ import {
   parseLianUserMeta,
   proxiedPostImageUrl
 } from "../../content-utils.js";
-import { config } from "../../config.js";
 import { makeNodebbGateways } from "../gateways/nodebb/index.js";
 import { makeAudiencePolicy } from "../policies/audience-policy.js";
 import { makeGetFeedUseCase } from "../usecases/feed/get-feed.js";
 import { makeGetFeedDebugUseCase } from "../usecases/feed/get-feed-debug.js";
 import { makeGetPostDetailUseCase } from "../usecases/posts/get-post-detail.js";
 
-const defaultTabs = ["此刻", "精选"];
+const defaultTabs = [
+  { id: "此刻", label: "此刻" },
+  { id: "精选", label: "精选" }
+];
 
-function normalizeTopicForClient(topic = {}, metadata = {}) {
-  const tid = Number(topic.tid || topic.topic?.tid || topic.id || 0) || 0;
+function normalizeTabs(tabs = []) {
+  const source = Array.isArray(tabs) && tabs.length ? tabs : defaultTabs;
+  return source
+    .map((tab) => {
+      if (typeof tab === "string") return { id: tab, label: tab };
+      const id = String(tab?.id || tab?.label || "").trim();
+      const label = String(tab?.label || tab?.id || "").trim();
+      return id && label ? { id, label } : null;
+    })
+    .filter(Boolean);
+}
+
+function normalizeTopicForDomain(topic = {}, metadata = {}) {
+  const tid = Number(topic.tid || topic.topic?.tid || 0) || 0;
   const post = topic.posts?.[0] || topic.teaser || {};
   const contentHtml = post.content || topic.content || "";
   const userMeta = parseLianUserMeta(contentHtml);
-  const meta = metadata || {};
   const tags = Array.isArray(topic.tags) ? topic.tags : [];
-  const tag = tags[0]?.value || tags[0]?.name || tags[0] || "";
-  const imageUrls = Array.isArray(meta.imageUrls)
-    ? meta.imageUrls.map((url) => normalizePostImageUrl(url, { width: 900 })).filter(Boolean)
+  const tagValues = tags.map((item) => item.value || item.name || item).filter(Boolean);
+  const imageUrls = Array.isArray(metadata.imageUrls)
+    ? metadata.imageUrls.map((url) => normalizePostImageUrl(url, { width: 900 })).filter(Boolean)
     : [];
   const cover = imageUrls[0] ? proxiedPostImageUrl(imageUrls[0], { width: 600 }) : extractCover(contentHtml);
-  const title = topic.titleRaw || topic.title || meta.title || "未命名";
+  const title = topic.titleRaw || topic.title || metadata.title || "未命名";
+
   return {
-    id: String(tid),
     tid,
     title,
-    tag,
-    tags: tags.map((item) => item.value || item.name || item).filter(Boolean),
-    summary: extractSummary(contentHtml, title),
+    bodyPreview: extractSummary(contentHtml, title),
+    contentHtml,
     cover,
+    imageUrls,
+    tags: tagValues,
+    primaryTag: tagValues[0] || "",
     timestampISO: topic.timestampISO || post.timestampISO || "",
-    timeLabel: meta.timeLabel || "",
-    startsAt: meta.startsAt || null,
-    endsAt: meta.endsAt || null,
-    expiresAt: meta.expiresAt || null,
-    priority: Number(meta.priority || 0),
-    isExpired: Boolean(meta.expiresAt && Date.now() > Date.parse(meta.expiresAt)),
-    contentType: meta.contentType || "general",
-    vibeTags: Array.isArray(meta.vibeTags) ? meta.vibeTags : [],
-    sceneTags: Array.isArray(meta.sceneTags) ? meta.sceneTags : [],
-    locationId: meta.locationId || "",
-    locationArea: meta.locationArea || "",
-    qualityScore: Number(meta.qualityScore || 0),
-    imageImpactScore: Number(meta.imageImpactScore || 0),
-    riskScore: Number(meta.riskScore || 0),
-    officialScore: Number(meta.officialScore || 0),
-    visibility: meta.visibility || "public",
-    audience: meta.audience || null,
-    distribution: Array.isArray(meta.distribution) ? meta.distribution : ["home", "search", "detail"],
-    keepAfterExpired: Boolean(meta.keepAfterExpired),
+    timeLabel: metadata.timeLabel || "",
+    contentType: metadata.contentType || "general",
+    locationArea: metadata.locationArea || "",
     author: userMeta.username || post.user?.username || topic.user?.username || "同学",
-    authorUserId: userMeta.userId || "",
-    authorIdentityTag: userMeta.identityTag || "",
-    authorAvatarText: userMeta.avatarText || String(userMeta.username || "").slice(0, 1),
     authorAvatarUrl: userMeta.avatarUrl || "",
-    replyCount: topic.postcount ? Math.max(0, Number(topic.postcount) - 1) : 0,
-    firstPostPid: Number(post.pid || topic.mainPid || topic.teaserPid || 0) || null,
+    authorIdentityTag: userMeta.identityTag || "",
     likeCount: Math.max(0, Number(post.upvotes ?? post.votes ?? post.reputation ?? topic.upvotes ?? topic.votes ?? 0) || 0),
-    nodebbUrl: `${config.nodebbPublicBaseUrl}/topic/${tid}`,
-    sourceUrl: meta.sourceUrl || ""
+    liked: false,
+    bookmarked: false,
+    sourceUrl: metadata.sourceUrl || "",
+    metadata,
+    topic
+  };
+}
+
+function toFeedItemDto(item = {}) {
+  return {
+    tid: Number(item.tid),
+    title: String(item.title || "未命名"),
+    bodyPreview: String(item.bodyPreview || ""),
+    cover: String(item.cover || ""),
+    author: String(item.author || "同学"),
+    authorAvatarUrl: String(item.authorAvatarUrl || ""),
+    authorIdentityTag: String(item.authorIdentityTag || ""),
+    timeLabel: String(item.timeLabel || ""),
+    timestampISO: String(item.timestampISO || ""),
+    likeCount: Math.max(0, Number(item.likeCount || 0) || 0),
+    liked: Boolean(item.liked),
+    locationArea: String(item.locationArea || ""),
+    contentType: String(item.contentType || "general")
+  };
+}
+
+function toReplyDto(post = {}) {
+  return {
+    id: Number(post.pid || post.index || 0) || 0,
+    content: String(post.content || ""),
+    author: String(post.user?.username || "同学"),
+    authorAvatarUrl: String(post.user?.picture || post.user?.userslugpicture || ""),
+    timestampISO: String(post.timestampISO || "")
+  };
+}
+
+function toPostDetailDto(item = {}) {
+  const posts = Array.isArray(item.topic?.posts) ? item.topic.posts : [];
+  const imageUrls = Array.isArray(item.imageUrls) ? item.imageUrls : [];
+  return {
+    tid: Number(item.tid),
+    title: String(item.title || "未命名"),
+    contentHtml: String(item.contentHtml || ""),
+    cover: String(item.cover || ""),
+    imageUrls,
+    author: String(item.author || "同学"),
+    authorAvatarUrl: String(item.authorAvatarUrl || ""),
+    authorIdentityTag: String(item.authorIdentityTag || ""),
+    timestampISO: String(item.timestampISO || ""),
+    timeLabel: String(item.timeLabel || ""),
+    likeCount: Math.max(0, Number(item.likeCount || 0) || 0),
+    liked: Boolean(item.liked),
+    bookmarked: Boolean(item.bookmarked),
+    locationArea: String(item.locationArea || ""),
+    sourceUrl: String(item.sourceUrl || ""),
+    replies: posts.slice(1).map(toReplyDto)
   };
 }
 
@@ -116,26 +165,23 @@ async function handleFeedRefactored(req, reqUrl, res) {
       postRepository: makePostRepository(),
       audiencePolicy: makeAudiencePolicy(),
       ranker: rankFeedItems,
-      mapper: ({ topic, metadata }) => normalizeTopicForClient(topic, metadata),
+      mapper: ({ topic, metadata }) => normalizeTopicForDomain(topic, metadata),
       cache: makeFeedCache()
     });
     const result = await usecase.execute({ actor: auth.user, page, context: "feed" });
     let items = result.items;
     if (tab && !["此刻", "精选"].includes(tab)) {
-      items = items.filter((item) => item.tags.includes(tab) || item.tag === tab);
+      items = items.filter((item) => item.tags.includes(tab) || item.primaryTag === tab);
     }
     const start = (page - 1) * limit;
     const selected = items.slice(start, start + limit);
     const rules = await loadRules().catch(() => ({}));
-    const tabs = Array.isArray(rules.tabs) && rules.tabs.length ? rules.tabs : defaultTabs;
+    const tabs = normalizeTabs(rules.tabs);
     sendJson(res, 200, {
-      items: selected,
-      page,
-      nextPage: start + limit < items.length ? page + 1 : null,
-      hasMore: start + limit < items.length,
       tabs,
-      feedEdition: { mode: "usecase" },
-      dataSource: "api"
+      items: selected.map(toFeedItemDto),
+      hasMore: start + limit < items.length,
+      nextPage: start + limit < items.length ? page + 1 : null
     });
   } catch (error) {
     sendJson(res, error.status || 500, { error: error.message });
@@ -170,18 +216,10 @@ async function handlePostDetailRefactored(req, tid, res) {
       audiencePolicy: makeAudiencePolicy(),
       postRepository: makePostRepository(),
       historyRepository: { recordView: async () => {} },
-      mapper: ({ topic, metadata }) => {
-        const item = normalizeTopicForClient(topic, metadata || {});
-        return {
-          ...item,
-          contentHtml: topic.posts?.[0]?.content || "",
-          posts: topic.posts || [],
-          raw: topic
-        };
-      },
+      mapper: ({ topic, metadata }) => normalizeTopicForDomain(topic, metadata || {}),
       cache: makeFeedCache()
     }).execute({ actor: auth.user, tid, nodebbUid });
-    sendJson(res, 200, detail);
+    sendJson(res, 200, toPostDetailDto(detail));
   } catch (error) {
     sendJson(res, error.status || 500, { error: error.message });
   }
