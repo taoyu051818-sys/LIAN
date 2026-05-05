@@ -341,6 +341,28 @@ async function handleOpsHealth(req, reqUrl, res) {
     };
   }));
 
+  checks.push(await safeCheck("ops-page", async () => {
+    const result = await fetchText(`${publicBaseUrl}/ops.html`);
+    return {
+      status: result.status,
+      elapsedMs: result.elapsedMs,
+      contentType: result.contentType,
+      hasOpsHtml: /LIAN Ops|ops-card/i.test(result.body)
+    };
+  }));
+
+  checks.push(await safeCheck("setup-status", async () => {
+    const result = await fetchText(`${publicBaseUrl}/api/setup/status`);
+    const json = parseJson(result.body);
+    return {
+      status: result.status,
+      elapsedMs: result.elapsedMs,
+      contentType: result.contentType,
+      jsonValid: Boolean(json),
+      securityMode: json?.securityMode || null
+    };
+  }));
+
   checks.push(await safeCheck("api-feed", async () => {
     const result = await fetchText(`${publicBaseUrl}/api/feed`);
     const json = parseJson(result.body);
@@ -349,7 +371,7 @@ async function handleOpsHealth(req, reqUrl, res) {
       elapsedMs: result.elapsedMs,
       contentType: result.contentType,
       jsonValid: Boolean(json),
-      ...imageDeliverySummary(result.body)
+      itemCount: Array.isArray(json?.items) ? json.items.length : null
     };
   }));
 
@@ -365,9 +387,11 @@ async function handleOpsHealth(req, reqUrl, res) {
     };
   }));
 
-  const apiFeed = checks.find((check) => check.name === "api-feed");
-  const ok = checks.every((check) => check.ok && (!check.status || check.status >= 200 && check.status < 300)) &&
-    apiFeed && apiFeed.jsonValid && !apiFeed.usesLianImageProxy && apiFeed.cloudinaryDirectCount > 0;
+  const ok = checks.every((check) =>
+    check.ok &&
+    (!check.status || (check.status >= 200 && check.status < 300)) &&
+    check.jsonValid !== false
+  );
 
   sendJson(res, 200, {
     ok,
