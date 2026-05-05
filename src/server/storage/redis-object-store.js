@@ -4,6 +4,17 @@ import { getRedisClient, redisKey } from "./redis-client.js";
 import { KEYS } from "./redis-store.js";
 
 const MAP_LAYER_KINDS = ["areas", "routes", "roads", "junctions", "buildings", "environmentElements", "buildingGroups", "assets"];
+const AUTH_OBJECT_PATTERNS = [
+  "auth:user:*",
+  "auth:email:*",
+  "auth:username:*",
+  "auth:session:*",
+  "auth:sessions",
+  "auth:invite:*",
+  "auth:invites",
+  "auth:verification:*",
+  "auth:verifications"
+];
 
 function stableId(value, fallback = "") {
   const raw = String(value || fallback || "").trim();
@@ -105,6 +116,65 @@ async function writeObjectFeedRules(client, data = {}) {
   await clearPattern(client, "feed:rule:*");
   for (const key of keys) await setJson(client, `feed:rule:${stableId(key)}`, { key, value: data[key] });
   await replaceSet(client, "feed:rules:keys", keys);
+}
+
+async function clearAuthObjectIndexes(client) {
+  for (const pattern of AUTH_OBJECT_PATTERNS) await clearPattern(client, pattern);
+}
+
+async function writeRedisObjectAuthStore(store = {}) {
+  const client = await getRedisClient();
+  await clearAuthObjectIndexes(client);
+
+  const users = Array.isArray(store.users) ? store.users : [];
+  const sessions = store.sessions && typeof store.sessions === "object" ? store.sessions : {};
+  const invites = store.invites && typeof store.invites === "object" ? store.invites : {};
+  const verifications = store.verifications && typeof store.verifications === "object" ? store.verifications : {};
+
+  const userIds = [];
+  for (const user of users) {
+    const id = stableId(user.id || user.userId || user.uid || user.email || user.username);
+    if (!id) continue;
+    userIds.push(id);
+    await setJson(client, `auth:user:${id}`, user);
+    if (user.email) await client.set(redisKey(`auth:email:${stableId(normalizeIndexValue(user.email))}`), id);
+    if (user.username) await client.set(redisKey(`auth:username:${stableId(normalizeIndexValue(user.username))}`), id);
+  }
+  await replaceSet(client, "auth:user:ids", userIds);
+
+  const sessionHashes = [];
+  for (const [token, session] of Object.entries(sessions)) {
+    const hash = tokenHash(token);
+    if (!hash) continue;
+    sessionHashes.push(hash);
+    await setJson(client, `auth:session:${hash}`, { tokenHash: hash, ...(session || {}) });
+  }
+  await replaceSet(client, "auth:sessions", sessionHashes);
+
+  const inviteKeys = [];
+  for (const [code, invite] of Object.entries(invites)) {
+    const key = stableId(code);
+    if (!key) continue;
+    inviteKeys.push(key);
+    await setJson(client, `auth:invite:${key}`, { code, ...(invite || {}) });
+  }
+  await replaceSet(client, "auth:invites", inviteKeys);
+
+  const verificationKeys = [];
+  for (const [key, verification] of Object.entries(verifications)) {
+    const indexKey = stableId(normalizeIndexValue(key));
+    if (!indexKey) continue;
+    verificationKeys.push(indexKey);
+    await setJson(client, `auth:verification:${indexKey}`, { key, ...(verification || {}) });
+  }
+  await replaceSet(client, "auth:verifications", verificationKeys);
+
+  return {
+    users: userIds.length,
+    sessions: sessionHashes.length,
+    invites: inviteKeys.length,
+    verifications: verificationKeys.length
+  };
 }
 
 async function writeRedisObjectAuthUser(user = {}) {
@@ -382,6 +452,7 @@ export {
   readRedisObjectData,
   writeRedisObjectAuthInvite,
   writeRedisObjectAuthSession,
+  writeRedisObjectAuthStore,
   writeRedisObjectAuthUser,
   writeRedisObjectAuthVerification,
   writeRedisObjectChannelReadItem,
