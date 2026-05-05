@@ -1,6 +1,7 @@
 import { handleAdmin } from "./admin-routes.js";
 import { handleAiPostDraft, handleAiPostPublish } from "./ai-light-publish.js";
 import { handleAiPostPreview } from "./ai-post-preview.js";
+import { handleIdentityActors } from "./author-service.js";
 import {
   handleActivateAlias,
   handleAuthAvatar,
@@ -128,6 +129,7 @@ const ROUTE_HANDLERS = {
   "auth-aliases-post": ({ req, res }) => handleCreateAlias(req, res),
   "auth-alias-deactivate": ({ req, res }) => handleDeactivateAlias(req, res),
   "auth-alias-activate": ({ req, res }) => handleActivateAlias(req, res),
+  "identity-actors": ({ reqUrl, res }) => handleIdentityActors(reqUrl, res),
   feed: ({ req, reqUrl, res }) => handleFeed(req, reqUrl, res),
   "feed-debug": ({ req, reqUrl, res }) => handleFeedDebug(req, reqUrl, res),
   tags: async ({ res }) => sendJson(res, 200, await nodebbFetch("/api/tags")),
