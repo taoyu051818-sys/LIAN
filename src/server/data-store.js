@@ -14,7 +14,12 @@ import {
   userCachePath
 } from "./paths.js";
 import { areRedisObjectReadsEnabled, isRedisStorageEnabled, redisConfig } from "./storage/redis-client.js";
-import { appendRedisObjectListItem, readRedisObjectData, writeRedisObjectData } from "./storage/redis-object-store.js";
+import {
+  appendRedisObjectListItem,
+  readRedisObjectData,
+  writeRedisObjectData,
+  writeRedisObjectPostMetadataItem
+} from "./storage/redis-object-store.js";
 import { KEYS, appendJsonArrayKey, readJsonKey, writeJsonKey } from "./storage/redis-store.js";
 
 const DEFAULT_RULES = { tabs: ["精选"], pinnedTids: [], tagWeights: {}, recencyHalfLifeHours: 96, coverBonus: 0 };
@@ -143,7 +148,14 @@ async function patchPostMetadata(tid, patch = {}) {
     const data = await readJsonData(metadataPath, DEFAULT_METADATA_FILE);
     data.items ||= {};
     data.items[key] = { ...(data.items[key] || {}), ...patch };
-    await writeJsonFile(metadataPath, data);
+    if (redisStorageEnabled()) {
+      if (areRedisObjectReadsEnabled()) {
+        await writeRedisObjectPostMetadataItem(key, data.items[key]);
+      }
+      await writeJsonKey(KEYS.metadata, data);
+    } else {
+      await writeJsonFile(metadataPath, data);
+    }
     memory.metadata = data.items;
     memory.metadataLoadedAt = Date.now();
     memory.feedPages.clear();
