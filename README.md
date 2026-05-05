@@ -4,6 +4,21 @@ Backend runtime for LIAN. The service connects to NodeBB, prepares the campus fe
 
 Content editing, NodeBB post preparation, and recommendation principles are documented in [`EDITORIAL_PRINCIPLES.md`](./EDITORIAL_PRINCIPLES.md).
 
+## Current repo role
+
+This repository is the active backend/API/runtime source of truth.
+
+Frontend/mobile web work lives in `taoyu051818-sys/lian-mobile-web`. The historical full-stack transition repository `taoyu051818-sys/lian-mobile-web-full` is not an active runtime source.
+
+Before starting implementation or review, read:
+
+1. `docs/agent/references/PR_DERIVED_STATUS_2026-05-05.md`
+2. `docs/agent/references/TASK_BOARD_OVERRIDE_2026-05-05.md`
+3. `docs/agent/references/DOC_REVIEW_FINDINGS_2026-05-05.md`
+4. `docs/agent/README.md`
+
+These files override older task-board and handoff text when they conflict with current merged PRs and code.
+
 ## Current data model
 
 The active runtime data model is **Redis object-native**.
@@ -159,7 +174,7 @@ Session object keys use the SHA-256 hash of the raw session token. The raw token
 
 ## Tests and checks
 
-General structure and encoding checks:
+General structure, docs, route registry, encoding, and guard checks:
 
 ```bash
 npm run check
@@ -170,6 +185,13 @@ Node tests:
 ```bash
 npm test
 npm run test:routes
+npm run test:route-registry
+```
+
+Broad backend verification matrix:
+
+```bash
+npm run verify
 ```
 
 Redis object-native runtime checks:
@@ -178,6 +200,12 @@ Redis object-native runtime checks:
 npm run test:object-native
 npm run verify:redis
 npm run verify:redis:auth
+```
+
+Docs inventory:
+
+```bash
+npm run docs:list
 ```
 
 ## Legacy migration tools
