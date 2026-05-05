@@ -12,7 +12,7 @@ const OPTIONAL_ENV = [
 function requireEnv(name) {
   const value = process.env[name];
   if (!value) throw new Error(`${name} is required`);
-  return value.replace(/\/$/, "");
+  return value.replace(/\/+$/, "");
 }
 
 function boolEnv(name) {
