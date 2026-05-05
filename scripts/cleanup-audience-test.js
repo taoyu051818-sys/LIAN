@@ -6,31 +6,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import { config } from "../src/server/config.js";
+import { nodebbFetchBearerJson } from "../src/server/nodebb-client.js";
+
 const ROOT = path.resolve(import.meta.dirname, "..");
-
-function loadEnv() {
-  try {
-    const text = fs.readFileSync(path.join(ROOT, ".env"), "utf8");
-    for (const line of text.split(/\r?\n/)) {
-      const m = line.match(/^([^#=]+)=(.*)$/);
-      if (m) {
-        const key = m[1].trim();
-        const val = m[2].trim().replace(/^["']|["']$/g, "");
-        if (!process.env[key]) process.env[key] = val;
-      }
-    }
-  } catch {}
-}
-loadEnv();
-
-function parsePositiveInteger(value, fallback) {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-const BASE = (process.env.NODEBB_BASE_URL || "http://149.104.21.74:4567").replace(/\/+$/, "");
-const TOKEN = process.env.NODEBB_API_TOKEN || "";
-const NODEBB_UID = String(parsePositiveInteger(process.env.NODEBB_UID, 2));
 const AUTH_PATH = path.join(ROOT, "data", "auth-users.json");
 const META_PATH = path.join(ROOT, "data", "post-metadata.json");
 
@@ -39,27 +18,7 @@ function loadJson(filePath) {
 }
 
 function saveJson(filePath, data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n", "utf8");
-}
-
-async function bbFetch(apiPath, options = {}) {
-  const url = new URL(apiPath, BASE);
-  url.searchParams.set("_uid", NODEBB_UID);
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      accept: "application/json",
-      "content-type": "application/json",
-      authorization: `Bearer ${TOKEN}`,
-      ...options.headers
-    },
-    signal: options.signal || AbortSignal.timeout(10000)
-  });
-  const text = await res.text();
-  let data;
-  try { data = JSON.parse(text); } catch { data = { raw: text }; }
-  if (!res.ok) throw new Error(`${res.status}: ${text.slice(0, 200)}`);
-  return data;
+  fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
 
 const TEST_USERNAMES = [
@@ -89,62 +48,63 @@ const TEST_TITLE_FRAGMENTS = [
 async function main() {
   console.log("=== 受众系统测试环境清理 ===\n");
 
-  // 1. Remove test post metadata
   console.log("▶ 清理测试帖子元数据...");
   const metadata = loadJson(META_PATH);
   let removedPosts = 0;
   for (const [tid, meta] of Object.entries(metadata)) {
-    if (TEST_TITLE_FRAGMENTS.some((f) => (meta.title || "").includes(f))) {
+    if (TEST_TITLE_FRAGMENTS.some((fragment) => (meta.title || "").includes(fragment))) {
       delete metadata[tid];
-      removedPosts++;
+      removedPosts += 1;
       console.log(`  移除 tid ${tid}: ${meta.title}`);
     }
   }
   saveJson(META_PATH, metadata);
   console.log(`  共移除 ${removedPosts} 条\n`);
 
-  // 2. Remove test users from auth store
   console.log("▶ 清理测试用户...");
   const authStore = loadJson(AUTH_PATH);
   let removedUsers = 0;
-  authStore.users = authStore.users.filter((u) => {
-    if (TEST_USERNAMES.includes(u.username)) {
-      console.log(`  移除 ${u.username} (${u.id})`);
-      removedUsers++;
+  authStore.users = authStore.users.filter((user) => {
+    if (TEST_USERNAMES.includes(user.username)) {
+      console.log(`  移除 ${user.username} (${user.id})`);
+      removedUsers += 1;
       return false;
     }
     return true;
   });
   for (const [token, session] of Object.entries(authStore.sessions || {})) {
-    if (!authStore.users.some((u) => u.id === session.userId)) {
+    if (!authStore.users.some((user) => user.id === session.userId)) {
       delete authStore.sessions[token];
     }
   }
   saveJson(AUTH_PATH, authStore);
   console.log(`  共移除 ${removedUsers} 个用户\n`);
 
-  // 3. Delete test posts from NodeBB
-  if (TOKEN) {
+  if (config.nodebbToken) {
     console.log("▶ 清理 NodeBB 测试帖子...");
     let deleted = 0;
     try {
-      for (let page = 1; page <= 10; page++) {
-        const data = await bbFetch(`/api/recent?page=${page}`);
-        for (const t of (data.topics || [])) {
-          if (TEST_TITLE_FRAGMENTS.some((f) => (t.title || "").includes(f))) {
+      for (let page = 1; page <= 10; page += 1) {
+        const data = await nodebbFetchBearerJson(`/api/recent?page=${page}`);
+        const topics = data.topics || [];
+        for (const topic of topics) {
+          if (TEST_TITLE_FRAGMENTS.some((fragment) => (topic.title || "").includes(fragment))) {
             try {
-              await bbFetch(`/api/v3/topics/${t.tid}/state`, { method: "PUT", body: "{}" });
-              console.log(`  删除 tid ${t.tid}: ${t.title}`);
-              deleted++;
-            } catch (e) {
-              console.log(`  跳过 tid ${t.tid}: ${e.message}`);
+              await nodebbFetchBearerJson(`/api/v3/topics/${topic.tid}/state`, {
+                method: "PUT",
+                body: "{}"
+              });
+              console.log(`  删除 tid ${topic.tid}: ${topic.title}`);
+              deleted += 1;
+            } catch (error) {
+              console.log(`  跳过 tid ${topic.tid}: ${error.message}`);
             }
           }
         }
-        if ((data.topics || []).length < 20) break;
+        if (topics.length < 20) break;
       }
-    } catch (e) {
-      console.log(`  NodeBB 清理失败: ${e.message}`);
+    } catch (error) {
+      console.log(`  NodeBB 清理失败: ${error.message}`);
     }
     console.log(`  共删除 ${deleted} 条\n`);
   } else {
@@ -154,7 +114,7 @@ async function main() {
   console.log("=== 清理完成 ===");
 }
 
-main().catch((e) => {
-  console.error("致命错误:", e.message);
+main().catch((error) => {
+  console.error("致命错误:", error.message);
   process.exit(1);
 });
