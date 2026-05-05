@@ -6,7 +6,7 @@ import { loadAuthStore, saveAuthStore } from "./data-store.js";
 import { nodebbFetch } from "./nodebb-client.js";
 import { isProductionMode } from "./security-mode.js";
 import { isRedisStorageEnabled } from "./storage/redis-client.js";
-import { readRedisObjectAuthSession, readRedisObjectAuthUserById } from "./storage/redis-object-store.js";
+import { readRedisObjectAuthSession, readRedisObjectAuthUserById, writeRedisObjectAuthUser } from "./storage/redis-object-store.js";
 import { authInstitutions } from "./static-data.js";
 
 function allowedIdentityTags(user = {}) {
@@ -120,7 +120,11 @@ async function ensureNodebbUid(auth) {
   auth.user.nodebbUsername = nodebbUser.username || auth.user.username;
   auth.user.nodebbPicture = nodebbUser.picture || "";
   auth.user.nodebbLinkedAt = new Date().toISOString();
-  await saveAuthStore(auth.store);
+  if (authObjectNativeEnabled()) {
+    await writeRedisObjectAuthUser(auth.user);
+  } else {
+    await saveAuthStore(auth.store);
+  }
   return uid;
 }
 
@@ -279,6 +283,10 @@ function sessionCookie(token, maxAge = 60 * 60 * 24 * 30) {
 
 function authObjectReadsEnabled() {
   return isRedisStorageEnabled() && String(process.env.LIAN_AUTH_OBJECT_READS || "").toLowerCase() === "true";
+}
+
+function authObjectNativeEnabled() {
+  return isRedisStorageEnabled() && String(process.env.LIAN_AUTH_OBJECT_NATIVE || "").toLowerCase() === "true";
 }
 
 async function getCurrentUserFromBulk(req, store = null) {

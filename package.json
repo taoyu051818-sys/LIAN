@@ -22,7 +22,8 @@
     "cleanup:redis:legacy-bulk": "node scripts/delete-redis-legacy-bulk-keys.js",
     "test:redis:objects": "node scripts/test-redis-object-store.js",
     "test:redis:auth": "node scripts/test-redis-auth-object-indexes.js",
-    "verify:redis:auth": "node scripts/verify-redis-auth-object-indexes.js"
+    "verify:redis:auth": "node scripts/verify-redis-auth-object-indexes.js",
+    "test:object-native": "node scripts/test-object-native-runtime.js"
   },
   "dependencies": {
     "redis": "^4.7.0"

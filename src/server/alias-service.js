@@ -7,8 +7,21 @@ import { sendJson } from "./http-response.js";
 import { readJsonBody } from "./request-utils.js";
 import { requireUser, publicAuthUser } from "./auth-service.js";
 import { loadAuthStore, saveAuthStore } from "./data-store.js";
+import { writeRedisObjectAuthUser } from "./storage/redis-object-store.js";
 
 const MAX_ALIASES_PER_USER = 1;
+
+function authObjectNativeEnabled() {
+  return String(process.env.LIAN_AUTH_OBJECT_NATIVE || "").toLowerCase() === "true";
+}
+
+async function saveAuthUserMutation(auth) {
+  if (authObjectNativeEnabled()) {
+    await writeRedisObjectAuthUser(auth.user);
+  } else {
+    await saveAuthUserMutation(auth);
+  }
+}
 
 async function loadAliasPool() {
   const now = Date.now();
@@ -108,7 +121,7 @@ async function handleCreateAlias(req, res) {
 
   auth.user.aliases = [...existing, alias];
   auth.user.activeAliasId = alias.id;
-  await saveAuthStore(auth.store);
+  await saveAuthUserMutation(auth);
 
   sendJson(res, 200, {
     alias: normalizeAlias(alias),
@@ -122,7 +135,7 @@ async function handleDeactivateAlias(req, res) {
     return sendJson(res, 400, { error: "当前没有活跃马甲" });
   }
   auth.user.activeAliasId = null;
-  await saveAuthStore(auth.store);
+  await saveAuthUserMutation(auth);
   sendJson(res, 200, {
     ok: true,
     activeAliasId: null
@@ -137,7 +150,7 @@ async function handleActivateAlias(req, res) {
   const alias = findUserAlias(auth.user, aliasId);
   if (!alias) return sendJson(res, 404, { error: "alias not found" });
   auth.user.activeAliasId = alias.id;
-  await saveAuthStore(auth.store);
+  await saveAuthUserMutation(auth);
   sendJson(res, 200, { ok: true, activeAliasId: alias.id });
 }
 

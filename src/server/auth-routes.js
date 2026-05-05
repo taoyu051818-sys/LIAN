@@ -7,6 +7,17 @@ import { nodebbFetch } from "./nodebb-client.js";
 import { checkRateLimit } from "./rate-limit.js";
 import { getRequestOrigin, normalizeOrigin } from "./request-security.js";
 import { readJsonBody } from "./request-utils.js";
+import {
+  deleteRedisObjectAuthSession,
+  readRedisObjectAuthInvite,
+  readRedisObjectAuthUserById,
+  readRedisObjectAuthUserByLogin,
+  readRedisObjectAuthVerification,
+  writeRedisObjectAuthInvite,
+  writeRedisObjectAuthSession,
+  writeRedisObjectAuthUser,
+  writeRedisObjectAuthVerification
+} from "./storage/redis-object-store.js";
 import { authInstitutions } from "./static-data.js";
 import {
   createEmailCode,
@@ -25,6 +36,11 @@ import {
   verifyEmailCode,
   verifyPassword
 } from "./auth-service.js";
+
+function authObjectNativeEnabled() {
+  return String(process.env.LIAN_AUTH_OBJECT_NATIVE || "").toLowerCase() === "true";
+}
+
 
 async function handleAuthRules(res) {
   sendJson(res, 200, {
@@ -49,7 +65,11 @@ async function handleAuthAvatar(req, res) {
     return sendJson(res, 400, { error: "avatarUrl is not allowed" });
   }
   auth.user.avatarUrl = avatarUrl;
-  await saveAuthStore(auth.store);
+  if (authObjectNativeEnabled()) {
+    await writeRedisObjectAuthUser(auth.user);
+  } else {
+    await saveAuthStore(auth.store);
+  }
   sendJson(res, 200, { user: publicAuthUser(auth.user) });
 }
 
@@ -65,6 +85,32 @@ async function handleSendEmailCode(req, res) {
   if (!email || !email.includes("@")) return sendJson(res, 400, { error: "valid email is required" });
   const institution = findInstitutionByEmail(email);
   if (!institution) return sendJson(res, 400, { error: "该邮箱后缀不在高校认证名单内；邀请码注册可以不填邮箱" });
+
+  if (authObjectNativeEnabled()) {
+    if (await readRedisObjectAuthUserByLogin(email)) return sendJson(res, 409, { error: "email already registered" });
+    const key = normalizeLogin(email);
+    const existing = await readRedisObjectAuthVerification(key);
+    if (existing && Date.now() - Date.parse(existing.sentAt || 0) < 60_000) {
+      return sendJson(res, 429, { error: "请稍后再发送验证码" });
+    }
+
+    const code = createEmailCode();
+    await writeRedisObjectAuthVerification(key, {
+      email,
+      hash: hashEmailCode(email, code),
+      sentAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+      usedAt: null,
+      attempts: 0
+    });
+    await sendMail({
+      to: email,
+      subject: "黎安账号邮箱验证码",
+      text: `你的验证码是 ${code}，10 分钟内有效。`,
+      html: `<p>你的验证码是 <strong style="font-size:20px">${code}</strong>，10 分钟内有效。</p>`
+    });
+    return sendJson(res, 200, { ok: true, expiresInSeconds: 600, institution: institution.name });
+  }
 
   const store = await loadAuthStore();
   if (store.users.some((user) => user.email === email)) return sendJson(res, 409, { error: "email already registered" });
@@ -92,6 +138,75 @@ async function handleSendEmailCode(req, res) {
   });
   await saveAuthStore(store);
   sendJson(res, 200, { ok: true, expiresInSeconds: 600, institution: institution.name });
+}
+
+
+function isVerificationRecordValid(record, email, code) {
+  if (!record) return false;
+  if (Date.now() > Date.parse(record.expiresAt || 0)) return false;
+  if (record.usedAt) return false;
+  return record.hash === hashEmailCode(email, code);
+}
+
+async function handleAuthRegisterObjectNative(req, res, payload) {
+  const email = String(payload.email || "").trim().toLowerCase();
+  const username = String(payload.username || "").trim().slice(0, 30);
+  const password = String(payload.password || "");
+  const inviteCode = String(payload.inviteCode || "").trim().toUpperCase();
+  const emailCode = String(payload.emailCode || "").trim();
+
+  if (authObjectNativeEnabled()) return await handleAuthRegisterObjectNative(req, res, payload);
+  if (!username) return sendJson(res, 400, { error: "username is required" });
+  if (password.length < 8) return sendJson(res, 400, { error: "password must be at least 8 characters" });
+  if (await readRedisObjectAuthUserByLogin(username)) return sendJson(res, 409, { error: "username already registered" });
+  if (email && await readRedisObjectAuthUserByLogin(email)) return sendJson(res, 409, { error: "email already registered" });
+
+  const institution = email ? findInstitutionByEmail(email) : null;
+  let invitedBy = null;
+  let registerMethod = "email";
+  let tags = institution?.tags || ["高校认证"];
+  let invitePermission = Boolean(institution);
+
+  if (institution) {
+    const verification = await readRedisObjectAuthVerification(email);
+    if (!isVerificationRecordValid(verification, email, emailCode)) return sendJson(res, 400, { error: "email verification code is invalid or expired" });
+    await writeRedisObjectAuthVerification(email, { ...verification, usedAt: new Date().toISOString() });
+  } else {
+    const invite = inviteCode ? await readRedisObjectAuthInvite(inviteCode) : null;
+    if (!invite || invite.usedBy || invite.revokedAt) return sendJson(res, 400, { error: "valid invite code is required" });
+    const inviter = await readRedisObjectAuthUserById(invite.createdBy);
+    if (!inviter || !inviter.invitePermission || inviter.status !== "active") return sendJson(res, 403, { error: "inviter cannot invite new users" });
+    invitedBy = inviter.id;
+    registerMethod = "invite";
+    tags = ["邀请注册"];
+    invitePermission = false;
+    await writeRedisObjectAuthInvite(inviteCode, { ...invite, usedBy: email || username, usedAt: new Date().toISOString() });
+  }
+
+  const user = {
+    id: crypto.randomUUID(),
+    email: email || "",
+    username,
+    password: hashPassword(password),
+    institution: institution?.name || "",
+    tags,
+    status: "active",
+    registerMethod,
+    invitePermission,
+    invitedBy,
+    createdAt: new Date().toISOString()
+  };
+
+  const token = crypto.randomBytes(32).toString("base64url");
+  await writeRedisObjectAuthUser(user);
+  await writeRedisObjectAuthSession(token, {
+    userId: user.id,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 30 * 24 * 3600_000).toISOString()
+  });
+
+  res.setHeader("set-cookie", sessionCookie(token));
+  sendJson(res, 200, { user: publicAuthUser(user) });
 }
 
 async function handleAuthRegister(req, res) {
@@ -269,6 +384,46 @@ function upsertRemoteAuthUser(store, remoteUser = {}, login = "") {
   return user;
 }
 
+
+async function handleAuthLoginObjectNative(req, res, payload, login, password) {
+  const user = await readRedisObjectAuthUserByLogin(login);
+  if (!user || !verifyPassword(password, user)) {
+    try {
+      const store = await loadAuthStore();
+      const remoteUser = await remoteAuthLogin(payload, req);
+      if (!remoteUser) return sendJson(res, 401, { error: "email or password is incorrect" });
+      const localUser = upsertRemoteAuthUser(store, remoteUser, login);
+      if (localUser.status === "banned") return sendJson(res, 403, { error: "account banned" });
+
+      const token = crypto.randomBytes(32).toString("base64url");
+      await writeRedisObjectAuthUser(localUser);
+      await writeRedisObjectAuthSession(token, {
+        userId: localUser.id,
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 3600_000).toISOString()
+      });
+
+      res.setHeader("set-cookie", sessionCookie(token));
+      return sendJson(res, 200, { user: publicAuthUser(localUser), remoteAuth: true });
+    } catch (error) {
+      const expose = error.status === 502 || error.status === 503;
+      return sendJson(res, expose ? error.status : 401, { error: expose ? error.message : "email or password is incorrect" });
+    }
+  }
+
+  if (user.status === "banned") return sendJson(res, 403, { error: "account banned" });
+
+  const token = crypto.randomBytes(32).toString("base64url");
+  await writeRedisObjectAuthSession(token, {
+    userId: user.id,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 30 * 24 * 3600_000).toISOString()
+  });
+
+  res.setHeader("set-cookie", sessionCookie(token));
+  sendJson(res, 200, { user: publicAuthUser(user) });
+}
+
 async function handleAuthLogin(req, res) {
   const payload = await readJsonBody(req);
   const login = String(payload.login || payload.email || "").trim();
@@ -279,6 +434,7 @@ async function handleAuthLogin(req, res) {
   } catch (error) {
     return sendJson(res, error.status || 429, { error: error.message, retryAfterSeconds: error.retryAfterSeconds });
   }
+  if (authObjectNativeEnabled()) return await handleAuthLoginObjectNative(req, res, payload, login, password);
   const store = await loadAuthStore();
   const user = findUserByLogin(store, login);
   if (!user || !verifyPassword(password, user)) {
@@ -314,8 +470,13 @@ async function handleAuthLogin(req, res) {
 }
 
 async function handleAuthLogout(req, res) {
-  const store = await loadAuthStore();
   const token = parseCookies(req).lian_session || "";
+  if (authObjectNativeEnabled()) {
+    if (token) await deleteRedisObjectAuthSession(token);
+    res.setHeader("set-cookie", sessionCookie("", 0));
+    return sendJson(res, 200, { ok: true });
+  }
+  const store = await loadAuthStore();
   if (token) delete store.sessions[token];
   await saveAuthStore(store);
   res.setHeader("set-cookie", sessionCookie("", 0));
@@ -325,6 +486,18 @@ async function handleAuthLogout(req, res) {
 async function handleCreateInvite(req, res) {
   const auth = await requireUser(req);
   if (!auth.user.invitePermission || auth.user.status !== "active") return sendJson(res, 403, { error: "invite permission disabled" });
+  if (authObjectNativeEnabled()) {
+    let code = createInviteCode();
+    while (await readRedisObjectAuthInvite(code)) code = createInviteCode();
+    await writeRedisObjectAuthInvite(code, {
+      code,
+      createdBy: auth.user.id,
+      createdAt: new Date().toISOString(),
+      usedBy: null,
+      usedAt: null
+    });
+    return sendJson(res, 200, { code });
+  }
   const store = auth.store;
   let code = createInviteCode();
   while (store.invites[code]) code = createInviteCode();
@@ -367,6 +540,7 @@ async function handleMe(req, res) {
 }
 
 export {
+  authObjectNativeEnabled,
   getConfiguredRemoteAuthBaseUrl,
   handleAuthAvatar,
   handleAuthLogin,
