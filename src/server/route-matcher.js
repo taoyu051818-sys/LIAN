@@ -27,6 +27,7 @@ const EXACT_ROUTES = [
   { method: "POST", path: "/api/auth/aliases", id: "auth-aliases-post" },
   { method: "POST", path: "/api/auth/aliases/deactivate", id: "auth-alias-deactivate" },
   { method: "POST", path: "/api/auth/aliases/activate", id: "auth-alias-activate" },
+  { method: "GET", path: "/api/identity/actors", id: "identity-actors" },
   { method: "GET", path: "/api/feed", id: "feed" },
   { method: "GET", path: "/api/feed-debug", id: "feed-debug" },
   { method: "GET", path: "/api/tags", id: "tags" },
