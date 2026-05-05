@@ -27,14 +27,14 @@ import { handleMapV2Items } from "./map-v2-service.js";
 import { nodebbFetch } from "./nodebb-client.js";
 import { handleOpsAction, handleOpsHealth } from "./ops-service.js";
 import {
-  handleCreatePost,
-  handleGetHistory,
-  handleGetLikedPosts,
-  handleGetSavedPosts,
-  handleReportPost,
-  handleTogglePostLike,
-  handleTogglePostSave
-} from "./post-service.js";
+  handleCreatePostRefactored as handleCreatePost,
+  handleGetHistoryRefactored as handleGetHistory,
+  handleGetLikedPostsRefactored as handleGetLikedPosts,
+  handleGetSavedPostsRefactored as handleGetSavedPosts,
+  handleReportPostRefactored as handleReportPost,
+  handleTogglePostLikeRefactored as handleTogglePostLike,
+  handleTogglePostSaveRefactored as handleTogglePostSave
+} from "./app/handlers/post-handlers.js";
 import { requireSameOrigin } from "./request-security.js";
 import { matchRoute } from "./route-matcher.js";
 import { isProductionMode, securityModeName } from "./security-mode.js";
