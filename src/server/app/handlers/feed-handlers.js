@@ -6,9 +6,9 @@ import {
   extractCover,
   extractSummary,
   normalizePostImageUrl,
-  parseLianUserMeta,
   proxiedPostImageUrl
 } from "../../content-utils.js";
+import { authorFromTopic, fallbackAuthor, normalizeNodebbUid, resolveAuthorsByNodebbUids } from "../../author-service.js";
 import { makeNodebbGateways } from "../gateways/nodebb/index.js";
 import { makeAudiencePolicy } from "../policies/audience-policy.js";
 import { makeGetFeedUseCase } from "../usecases/feed/get-feed.js";
@@ -36,7 +36,6 @@ function normalizeTopicForDomain(topic = {}, metadata = {}) {
   const tid = Number(topic.tid || topic.topic?.tid || 0) || 0;
   const post = topic.posts?.[0] || topic.teaser || {};
   const contentHtml = post.content || topic.content || "";
-  const userMeta = parseLianUserMeta(contentHtml);
   const tags = Array.isArray(topic.tags) ? topic.tags : [];
   const tagValues = tags.map((item) => item.value || item.name || item).filter(Boolean);
   const imageUrls = Array.isArray(metadata.imageUrls)
@@ -44,6 +43,7 @@ function normalizeTopicForDomain(topic = {}, metadata = {}) {
     : [];
   const cover = imageUrls[0] ? proxiedPostImageUrl(imageUrls[0], { width: 600 }) : extractCover(contentHtml);
   const title = topic.titleRaw || topic.title || metadata.title || "未命名";
+  const author = authorFromTopic(topic, post);
 
   return {
     tid,
@@ -58,9 +58,7 @@ function normalizeTopicForDomain(topic = {}, metadata = {}) {
     timeLabel: metadata.timeLabel || "",
     contentType: metadata.contentType || "general",
     locationArea: metadata.locationArea || "",
-    author: userMeta.username || post.user?.username || topic.user?.username || "同学",
-    authorAvatarUrl: userMeta.avatarUrl || "",
-    authorIdentityTag: userMeta.identityTag || "",
+    author,
     likeCount: Math.max(0, Number(post.upvotes ?? post.votes ?? post.reputation ?? topic.upvotes ?? topic.votes ?? 0) || 0),
     liked: false,
     bookmarked: false,
@@ -71,14 +69,19 @@ function normalizeTopicForDomain(topic = {}, metadata = {}) {
 }
 
 function toFeedItemDto(item = {}) {
+  const author = item.author || fallbackAuthor();
   return {
     tid: Number(item.tid),
     title: String(item.title || "未命名"),
     bodyPreview: String(item.bodyPreview || ""),
     cover: String(item.cover || ""),
-    author: String(item.author || "同学"),
-    authorAvatarUrl: String(item.authorAvatarUrl || ""),
-    authorIdentityTag: String(item.authorIdentityTag || ""),
+    author: {
+      nodebbUid: normalizeNodebbUid(author.nodebbUid),
+      displayName: String(author.displayName || "同学"),
+      avatarUrl: String(author.avatarUrl || ""),
+      identityTag: String(author.identityTag || "校园身份"),
+      source: String(author.source || "fallback")
+    },
     timeLabel: String(item.timeLabel || ""),
     timestampISO: String(item.timestampISO || ""),
     likeCount: Math.max(0, Number(item.likeCount || 0) || 0),
@@ -89,11 +92,12 @@ function toFeedItemDto(item = {}) {
 }
 
 function toReplyDto(post = {}) {
+  const author = authorFromTopic({}, post);
   return {
     id: Number(post.pid || post.index || 0) || 0,
     content: String(post.content || ""),
-    author: String(post.user?.username || "同学"),
-    authorAvatarUrl: String(post.user?.picture || post.user?.userslugpicture || ""),
+    author: author.displayName,
+    authorAvatarUrl: author.avatarUrl,
     timestampISO: String(post.timestampISO || "")
   };
 }
@@ -101,15 +105,16 @@ function toReplyDto(post = {}) {
 function toPostDetailDto(item = {}) {
   const posts = Array.isArray(item.topic?.posts) ? item.topic.posts : [];
   const imageUrls = Array.isArray(item.imageUrls) ? item.imageUrls : [];
+  const author = item.author || fallbackAuthor();
   return {
     tid: Number(item.tid),
     title: String(item.title || "未命名"),
     contentHtml: String(item.contentHtml || ""),
     cover: String(item.cover || ""),
     imageUrls,
-    author: String(item.author || "同学"),
-    authorAvatarUrl: String(item.authorAvatarUrl || ""),
-    authorIdentityTag: String(item.authorIdentityTag || ""),
+    author: author.displayName,
+    authorAvatarUrl: author.avatarUrl,
+    authorIdentityTag: author.identityTag,
     timestampISO: String(item.timestampISO || ""),
     timeLabel: String(item.timeLabel || ""),
     likeCount: Math.max(0, Number(item.likeCount || 0) || 0),
@@ -153,6 +158,18 @@ function rankFeedItems(items = []) {
   });
 }
 
+async function applyAuthorDtos(items = [], nodebbUsers) {
+  const nodebbUids = items.map((item) => normalizeNodebbUid(item.author?.nodebbUid)).filter(Boolean);
+  const authors = await resolveAuthorsByNodebbUids(nodebbUids, { nodebbUsers });
+  return items.map((item) => {
+    const uid = normalizeNodebbUid(item.author?.nodebbUid);
+    return {
+      ...item,
+      author: uid ? (authors.get(uid) || item.author || fallbackAuthor(uid)) : (item.author || fallbackAuthor())
+    };
+  });
+}
+
 async function handleFeedRefactored(req, reqUrl, res) {
   try {
     const auth = await getCurrentUser(req);
@@ -174,7 +191,7 @@ async function handleFeedRefactored(req, reqUrl, res) {
       items = items.filter((item) => item.tags.includes(tab) || item.primaryTag === tab);
     }
     const start = (page - 1) * limit;
-    const selected = items.slice(start, start + limit);
+    const selected = await applyAuthorDtos(items.slice(start, start + limit), nodebb.users);
     const rules = await loadRules().catch(() => ({}));
     const tabs = normalizeTabs(rules.tabs);
     sendJson(res, 200, {
@@ -219,7 +236,8 @@ async function handlePostDetailRefactored(req, tid, res) {
       mapper: ({ topic, metadata }) => normalizeTopicForDomain(topic, metadata || {}),
       cache: makeFeedCache()
     }).execute({ actor: auth.user, tid, nodebbUid });
-    sendJson(res, 200, toPostDetailDto(detail));
+    const [resolved] = await applyAuthorDtos([detail], nodebb.users);
+    sendJson(res, 200, toPostDetailDto(resolved));
   } catch (error) {
     sendJson(res, error.status || 500, { error: error.message });
   }
