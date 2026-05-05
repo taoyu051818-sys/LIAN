@@ -9,13 +9,14 @@ When docs disagree, prefer this order:
 1. Current code on `main`.
 2. Merged GitHub PRs, especially newest PRs.
 3. `references/PR_DERIVED_STATUS_2026-05-05.md`.
-4. `references/DOC_REVIEW_FINDINGS_2026-05-05.md` for known stale-doc warnings.
-5. Latest handoff for the task area.
-6. Current task doc.
-7. `PROJECT_FILE_INDEX.md`.
-8. Domain docs.
-9. `ARCHITECTURE_WORKPLAN.md` and `04_DECISIONS.md`.
-10. Historical baseline/planning docs.
+4. `references/TASK_BOARD_OVERRIDE_2026-05-05.md` for active task-board interpretation.
+5. `references/DOC_REVIEW_FINDINGS_2026-05-05.md` for known stale-doc warnings.
+6. Latest handoff for the task area.
+7. Current task doc.
+8. `PROJECT_FILE_INDEX.md`.
+9. Domain docs.
+10. `ARCHITECTURE_WORKPLAN.md` and `04_DECISIONS.md`.
+11. Historical baseline/planning docs.
 
 ## Thread Workflow
 
@@ -31,16 +32,17 @@ Do not treat executor handoffs as acceptance. A lane becomes accepted only when 
 Read these in order before starting implementation work:
 
 1. `references/PR_DERIVED_STATUS_2026-05-05.md` - newest PR-derived backend/runtime status
-2. `references/DOC_REVIEW_FINDINGS_2026-05-05.md` - known stale-doc risks and cleanup recommendations
-3. `00_AGENT_RULES.md` - operating rules, validation, high-conflict files
-4. `ARCHITECTURE_WORKPLAN.md` - architecture direction and work organization; verify stale points against PRs
-5. `05_TASK_BOARD.md` - task context; may contain older status and must be checked against PRs
-6. `03_FILE_OWNERSHIP.md` - ownership and conflict boundaries
-7. `PROJECT_FILE_INDEX.md` - file index with status, owner, repo split destination
-8. `04_DECISIONS.md` - recorded architecture/product decisions
-9. `domains/<area>.md` - domain context for the task area
-10. `tasks/<task>.md` - current task specification, if present
-11. `handoffs/<task>.md` - latest thread handoff, if present
+2. `references/TASK_BOARD_OVERRIDE_2026-05-05.md` - current active task-board interpretation
+3. `references/DOC_REVIEW_FINDINGS_2026-05-05.md` - known stale-doc risks and cleanup recommendations
+4. `00_AGENT_RULES.md` - operating rules, validation, high-conflict files
+5. `ARCHITECTURE_WORKPLAN.md` - architecture direction and work organization; verify stale points against PRs
+6. `05_TASK_BOARD.md` - long task context; may contain older status and must be checked against PRs and override files
+7. `03_FILE_OWNERSHIP.md` - ownership and conflict boundaries
+8. `PROJECT_FILE_INDEX.md` - file index with status, owner, repo split destination
+9. `04_DECISIONS.md` - recorded architecture/product decisions
+10. `domains/<area>.md` - domain context for the task area
+11. `tasks/<task>.md` - current task specification, if present
+12. `handoffs/<task>.md` - latest thread handoff, if present
 
 For production deploy, Redis, PM2, forum gate, and security/development boundaries, read `references/OPS_SECURITY_DEV_BOUNDARY_2026-05-04.md` before changing ports, deployment commands, or storage settings.
 
@@ -75,6 +77,7 @@ Read `handoffs/README.md` for the normalized handoff list.
 ## References
 
 - `references/PR_DERIVED_STATUS_2026-05-05.md` - newest PR-derived status for the backend repo
+- `references/TASK_BOARD_OVERRIDE_2026-05-05.md` - current active task-board override
 - `references/DOC_REVIEW_FINDINGS_2026-05-05.md` - documentation review findings and stale-doc warning list
 - `references/OPS_SECURITY_DEV_BOUNDARY_2026-05-04.md` - production runtime chain, forum-gate security boundary, PM2 deploy rule, Redis DB boundary, and cross-origin troubleshooting notes
 - `references/HIGH_RISK_AREAS.md` - high-risk area audits
