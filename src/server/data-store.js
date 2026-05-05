@@ -29,9 +29,24 @@ const DEFAULT_RULES = { tabs: ["精选"], pinnedTids: [], tagWeights: {}, recenc
 const DEFAULT_METADATA_FILE = { items: {} };
 const DEFAULT_CHANNEL_READS = { version: 1, items: {} };
 const DEFAULT_USER_CACHE = { version: 1, users: {}, actors: {} };
+const OBJECT_PRIMARY_BULK_SKIP_KEYS = new Set([
+  KEYS.metadata,
+  KEYS.channelReads,
+  KEYS.userCache,
+  KEYS.aiDrafts,
+  KEYS.aiRecords
+]);
 
 function redisStorageEnabled() {
   return isRedisStorageEnabled();
+}
+
+function redisObjectPrimaryEnabled() {
+  return redisStorageEnabled() && areRedisObjectReadsEnabled() && String(process.env.LIAN_REDIS_OBJECT_PRIMARY || "").toLowerCase() === "true";
+}
+
+function shouldWriteBulkCompat(key) {
+  return !redisObjectPrimaryEnabled() || !OBJECT_PRIMARY_BULK_SKIP_KEYS.has(key);
 }
 
 function redisStorageKeyForPath(filePath = "") {
@@ -72,7 +87,9 @@ async function writeJsonFile(filePath, data) {
     if (areRedisObjectReadsEnabled()) {
       await writeRedisObjectData(key, data);
     }
-    await writeJsonKey(key, data);
+    if (shouldWriteBulkCompat(key)) {
+      await writeJsonKey(key, data);
+    }
     return;
   }
   await fs.mkdir(path.dirname(filePath), { recursive: true });
@@ -87,12 +104,12 @@ async function appendJsonLine(filePath, data) {
       const base = path.basename(filePath);
       if (base === "ai-post-drafts.jsonl") {
         if (areRedisObjectReadsEnabled()) await appendRedisObjectListItem(KEYS.aiDrafts, data);
-        await appendJsonArrayKey(KEYS.aiDrafts, data);
+        if (shouldWriteBulkCompat(KEYS.aiDrafts)) await appendJsonArrayKey(KEYS.aiDrafts, data);
         return;
       }
       if (base === "ai-post-records.jsonl") {
         if (areRedisObjectReadsEnabled()) await appendRedisObjectListItem(KEYS.aiRecords, data);
-        await appendJsonArrayKey(KEYS.aiRecords, data);
+        if (shouldWriteBulkCompat(KEYS.aiRecords)) await appendJsonArrayKey(KEYS.aiRecords, data);
         return;
       }
     }
@@ -155,7 +172,9 @@ async function patchPostMetadata(tid, patch = {}) {
       if (areRedisObjectReadsEnabled()) {
         await writeRedisObjectPostMetadataItem(key, data.items[key]);
       }
-      await writeJsonKey(KEYS.metadata, data);
+      if (shouldWriteBulkCompat(KEYS.metadata)) {
+        await writeJsonKey(KEYS.metadata, data);
+      }
     } else {
       await writeJsonFile(metadataPath, data);
     }
@@ -188,7 +207,9 @@ async function saveChannelReadItems(data, eventIds = []) {
     for (const id of ids) {
       if (data?.items?.[id]) await writeRedisObjectChannelReadItem(id, data.items[id]);
     }
-    await writeJsonKey(KEYS.channelReads, data);
+    if (shouldWriteBulkCompat(KEYS.channelReads)) {
+      await writeJsonKey(KEYS.channelReads, data);
+    }
   } else {
     await saveChannelReads(data);
   }
@@ -216,6 +237,7 @@ async function writeAuthStoreSnapshot(normalized) {
     if (areRedisObjectReadsEnabled()) {
       await writeRedisObjectAuthStore(normalized);
     }
+    // Keep auth:store as a compatibility source for login, invite, and verification flows until auth APIs no longer require raw-token bulk structure.
     await writeJsonKey(KEYS.authStore, normalized);
     return;
   }
@@ -258,7 +280,9 @@ async function saveUserCache(data) {
 async function saveUserCacheEntry(cache, userId, entry) {
   if (redisStorageEnabled() && areRedisObjectReadsEnabled()) {
     await writeRedisObjectUserCacheEntry(userId, entry);
-    await writeJsonKey(KEYS.userCache, cache);
+    if (shouldWriteBulkCompat(KEYS.userCache)) {
+      await writeJsonKey(KEYS.userCache, cache);
+    }
   } else {
     await saveUserCache(cache);
   }
@@ -344,6 +368,7 @@ export {
   recordUserLike,
   recordUserSave,
   redisConfig,
+  redisObjectPrimaryEnabled,
   redisStorageEnabled,
   saveAuthStore,
   saveChannelReadItems,
