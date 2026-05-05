@@ -15,7 +15,9 @@
     "verify:redis:prod": "node scripts/verify-redis-migration.js --allow-growth",
     "migrate:redis:objects": "node scripts/migrate-redis-object-keys.js",
     "verify:redis:objects": "node scripts/verify-redis-object-keys.js",
-    "test:redis:objects": "node scripts/test-redis-object-store.js"
+    "test:redis:objects": "node scripts/test-redis-object-store.js",
+    "test:redis:auth": "node scripts/test-redis-auth-object-indexes.js",
+    "verify:redis:auth": "node scripts/verify-redis-auth-object-indexes.js"
   },
   "dependencies": {
     "redis": "^4.7.0"
