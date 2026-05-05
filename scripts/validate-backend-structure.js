@@ -8,6 +8,7 @@ const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 const requiredFiles = [
   "server.js",
   "src/server/api-router.js",
+  "src/server/api-route-registry.js",
   "src/server/route-matcher.js",
   "src/server/post-service.js",
   "src/server/nodebb-client.js",
@@ -18,6 +19,7 @@ const requiredFiles = [
   "src/server/content-utils.js",
   "src/server/cache.js",
   "src/server/paths.js",
+  "scripts/test-route-registry.js",
   "data/feed-rules.json",
   "data/post-metadata.json",
   "package.json",
@@ -37,6 +39,7 @@ const jsonFiles = [
 const jsFilesToSyntaxCheck = [
   "server.js",
   "src/server/api-router.js",
+  "src/server/api-route-registry.js",
   "src/server/route-matcher.js",
   "src/server/post-service.js",
   "src/server/nodebb-client.js",
@@ -60,7 +63,8 @@ const jsFilesToSyntaxCheck = [
   "src/server/static-server.js",
   "src/server/setup-page.js",
   "src/server/task-board-service.js",
-  "scripts/validate-backend-structure.js"
+  "scripts/validate-backend-structure.js",
+  "scripts/test-route-registry.js"
 ];
 
 let passed = 0;
