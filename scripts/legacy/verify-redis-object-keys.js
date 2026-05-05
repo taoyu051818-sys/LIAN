@@ -1,5 +1,5 @@
-import { closeRedisClient, getRedisClient, redisConfig, redisKey } from "../src/server/storage/redis-client.js";
-import { KEYS, readJsonKey, readJsonListKey } from "../src/server/storage/redis-store.js";
+import { closeRedisClient, getRedisClient, redisConfig, redisKey } from "../../src/server/storage/redis-client.js";
+import { KEYS, readJsonKey, readJsonListKey } from "../../src/server/storage/redis-store.js";
 
 const LAYER_KINDS = ["areas", "routes", "roads", "junctions", "buildings", "environmentElements", "buildingGroups", "assets"];
 

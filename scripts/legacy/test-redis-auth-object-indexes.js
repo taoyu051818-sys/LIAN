@@ -5,7 +5,7 @@ import {
   getRedisClient,
   redisConfig,
   redisKey
-} from "../src/server/storage/redis-client.js";
+} from "../../src/server/storage/redis-client.js";
 import {
   deleteRedisObjectAuthSession,
   readRedisObjectAuthInvite,
@@ -17,7 +17,7 @@ import {
   writeRedisObjectAuthSession,
   writeRedisObjectAuthUser,
   writeRedisObjectAuthVerification
-} from "../src/server/storage/redis-object-store.js";
+} from "../../src/server/storage/redis-object-store.js";
 
 const REQUIRED_TEST_PREFIX_FRAGMENT = ":test:";
 

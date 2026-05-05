@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 
-import { closeRedisClient, getRedisClient, redisConfig, redisKey } from "../src/server/storage/redis-client.js";
-import { KEYS, readJsonKey, readJsonListKey, writeJsonKey } from "../src/server/storage/redis-store.js";
+import { closeRedisClient, getRedisClient, redisConfig, redisKey } from "../../src/server/storage/redis-client.js";
+import { KEYS, readJsonKey, readJsonListKey, writeJsonKey } from "../../src/server/storage/redis-store.js";
 
 const OBJECT_PATTERNS = [
   "postmeta:tid:*",

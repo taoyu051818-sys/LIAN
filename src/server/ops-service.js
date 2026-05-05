@@ -27,7 +27,9 @@ const OPS_ACTIONS = new Set([
   "restart-all",
   "update-frontend",
   "update-backend",
-  "update-all"
+  "update-all",
+  "set-security-development",
+  "set-security-production"
 ]);
 
 const DEPLOY_REPO_ACTIONS = new Map([
@@ -237,6 +239,43 @@ ${backendRestartScript()}
 `;
 }
 
+function securityModeUpdateScript(mode) {
+  const normalizedMode = mode === "production" ? "production" : "development";
+  const nodeEnv = normalizedMode === "production" ? "production" : "development";
+  const envFilePath = path.join(backendRepoDir, ".env");
+  const nodeScript = [
+    'const fs = require("node:fs");',
+    `const envPath = ${JSON.stringify(envFilePath)};`,
+    `const updates = ${JSON.stringify({
+      LIAN_SECURITY_MODE: normalizedMode,
+      SECURITY_MODE: normalizedMode,
+      NODE_ENV: nodeEnv
+    })};`,
+    'let text = "";',
+    'try { text = fs.readFileSync(envPath, "utf8"); } catch {}',
+    'const lines = text.split(/\\\\r?\\\\n/).filter((line, index, arr) => index < arr.length - 1 || line);',
+    'for (const [key, value] of Object.entries(updates)) {',
+    '  const next = `${key}="${value}"`;',
+    '  const index = lines.findIndex((line) => line.trim().startsWith(`${key}=`));',
+    '  if (index >= 0) lines[index] = next;',
+    '  else lines.push(next);',
+    '}',
+    'fs.writeFileSync(envPath, `${lines.join("\\\\n")}\\\\n`);',
+    'console.log(`[LIAN ops] security mode set to ${updates.LIAN_SECURITY_MODE} in ${envPath}`);'
+  ].join("\\n");
+
+  return `
+cd ${shellQuote(backendRepoDir)}
+node <<'NODE'
+${nodeScript}
+NODE
+LIAN_SECURITY_MODE=${shellQuote(normalizedMode)} SECURITY_MODE=${shellQuote(normalizedMode)} NODE_ENV=${shellQuote(nodeEnv)} pm2 restart ${shellQuote(backendPm2Name)} --update-env || LIAN_SECURITY_MODE=${shellQuote(normalizedMode)} SECURITY_MODE=${shellQuote(normalizedMode)} NODE_ENV=${shellQuote(nodeEnv)} pm2 start server.js --name ${shellQuote(backendPm2Name)} --update-env
+pm2 save
+sleep 2
+pm2 list
+`;
+}
+
 function scriptForAction(action) {
   switch (action) {
     case "restart-frontend":
@@ -251,6 +290,10 @@ function scriptForAction(action) {
       return backendUpdateScript();
     case "update-all":
       return `${frontendUpdateScript()}\n${backendUpdateScript()}`;
+    case "set-security-development":
+      return securityModeUpdateScript("development");
+    case "set-security-production":
+      return securityModeUpdateScript("production");
     default:
       return "";
   }

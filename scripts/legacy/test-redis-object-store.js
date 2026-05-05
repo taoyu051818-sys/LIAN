@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 
-import { closeRedisClient, getRedisClient, redisConfig, redisKey } from "../src/server/storage/redis-client.js";
-import { appendRedisObjectListItem, readRedisObjectData, writeRedisObjectData } from "../src/server/storage/redis-object-store.js";
-import { KEYS } from "../src/server/storage/redis-store.js";
+import { closeRedisClient, getRedisClient, redisConfig, redisKey } from "../../src/server/storage/redis-client.js";
+import { appendRedisObjectListItem, readRedisObjectData, writeRedisObjectData } from "../../src/server/storage/redis-object-store.js";
+import { KEYS } from "../../src/server/storage/redis-store.js";
 
 const REQUIRED_TEST_PREFIX_FRAGMENT = ":test:";
 

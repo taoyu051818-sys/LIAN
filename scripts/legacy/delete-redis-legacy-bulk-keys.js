@@ -3,8 +3,8 @@ import {
   getRedisClient,
   redisConfig,
   redisKey
-} from "../src/server/storage/redis-client.js";
-import { KEYS } from "../src/server/storage/redis-store.js";
+} from "../../src/server/storage/redis-client.js";
+import { KEYS } from "../../src/server/storage/redis-store.js";
 
 const LEGACY_BULK_KEYS = [
   KEYS.rules,

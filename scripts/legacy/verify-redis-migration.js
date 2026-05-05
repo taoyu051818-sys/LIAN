@@ -12,9 +12,9 @@ import {
   metadataPath,
   rulesPath,
   userCachePath
-} from "../src/server/paths.js";
-import { closeRedisClient, redisConfig } from "../src/server/storage/redis-client.js";
-import { KEYS, readJsonKey, readJsonListKey } from "../src/server/storage/redis-store.js";
+} from "../../src/server/paths.js";
+import { closeRedisClient, redisConfig } from "../../src/server/storage/redis-client.js";
+import { KEYS, readJsonKey, readJsonListKey } from "../../src/server/storage/redis-store.js";
 
 const allowGrowth = process.argv.includes("--allow-growth");
 
