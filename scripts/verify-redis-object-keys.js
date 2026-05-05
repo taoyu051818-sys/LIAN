@@ -15,9 +15,11 @@ async function setSize(client, key) {
   return await client.sCard(redisKey(key));
 }
 
-async function scanCount(client, pattern) {
+async function scanCount(client, pattern, exclude = []) {
+  const excluded = new Set(exclude.map((key) => redisKey(key)));
   let count = 0;
-  for await (const _key of client.scanIterator({ MATCH: redisKey(pattern), COUNT: 200 })) {
+  for await (const key of client.scanIterator({ MATCH: redisKey(pattern), COUNT: 200 })) {
+    if (excluded.has(key)) continue;
     count += 1;
   }
   return count;
@@ -56,7 +58,7 @@ async function verifyAuth(client) {
 
   const ok = [
     printResult("auth users set", users, await setSize(client, "auth:user:ids")),
-    printResult("auth users keys", users, await scanCount(client, "auth:user:*")),
+    printResult("auth users keys", users, await scanCount(client, "auth:user:*", ["auth:user:ids"])),
     printResult("auth sessions set", sessions, await setSize(client, "auth:sessions")),
     printResult("auth sessions keys", sessions, await scanCount(client, "auth:session:*")),
     printResult("auth invites set", invites, await setSize(client, "auth:invites")),
@@ -93,13 +95,13 @@ async function verifyMap(client) {
   const locations = await readJsonKey(KEYS.mapLocations, { items: [] });
   const locationCount = Array.isArray(locations?.items) ? locations.items.length : 0;
   let ok = printResult("map locations set", locationCount, await setSize(client, "map:location:index")) &&
-    printResult("map locations keys", locationCount, await scanCount(client, "map:location:*"));
+    printResult("map locations keys", locationCount, await scanCount(client, "map:location:*", ["map:location:index"]));
 
   const layers = await readJsonKey(KEYS.mapLayers, {});
   for (const kind of LAYER_KINDS) {
     const sourceCount = Array.isArray(layers?.[kind]) ? layers[kind].length : 0;
     ok = printResult(`map layer ${kind} set`, sourceCount, await setSize(client, `map:layer:${kind}:index`)) && ok;
-    ok = printResult(`map layer ${kind} keys`, sourceCount, await scanCount(client, `map:layer:${kind}:*`)) && ok;
+    ok = printResult(`map layer ${kind} keys`, sourceCount, await scanCount(client, `map:layer:${kind}:*`, [`map:layer:${kind}:index`])) && ok;
   }
   return ok;
 }
@@ -108,14 +110,14 @@ async function verifyArrayLike(client, sourceKey, itemPattern, indexKey, label) 
   const data = await readJsonKey(sourceKey, { items: [] });
   const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
   const ok = printResult(`${label} set`, items.length, await setSize(client, indexKey)) &&
-    printResult(`${label} keys`, items.length, await scanCount(client, itemPattern));
+    printResult(`${label} keys`, items.length, await scanCount(client, itemPattern, [indexKey]));
   return ok;
 }
 
 async function verifyJsonList(client, sourceKey, itemPattern, indexKey, label) {
   const rows = await readJsonListKey(sourceKey);
   const ok = printResult(`${label} set`, rows.length, await setSize(client, indexKey)) &&
-    printResult(`${label} keys`, rows.length, await scanCount(client, itemPattern));
+    printResult(`${label} keys`, rows.length, await scanCount(client, itemPattern, [indexKey]));
   return ok;
 }
 
