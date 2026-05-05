@@ -44,6 +44,7 @@ import { matchRoute } from "./route-matcher.js";
 import { isProductionMode, securityModeName } from "./security-mode.js";
 import { readJsonBody, requireAdmin } from "./request-utils.js";
 import { mapItems } from "./static-data.js";
+import { handleTaskBoard } from "./task-board-service.js";
 import { handleUploadImage } from "./upload.js";
 
 function setupStatusPayload() {
