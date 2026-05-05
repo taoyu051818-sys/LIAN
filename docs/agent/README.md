@@ -1,6 +1,6 @@
 # Agent Docs Index
 
-This directory is the working memory for Codex threads. Treat merged GitHub PRs and current code as more authoritative than older task-board, decision, domain, task, or handoff text.
+This directory is the working memory for Codex threads. Treat merged GitHub PRs and current code as more authoritative than older task-board, decision, domain, task, handoff, contract, or split-manifest text.
 
 ## Current Source-Of-Truth Rule
 
@@ -8,22 +8,27 @@ When docs disagree, prefer this order:
 
 1. Current code on `main`.
 2. Merged GitHub PRs, especially newest PRs.
-3. `references/PR_DERIVED_STATUS_2026-05-05.md`.
-4. `references/DECISIONS_OVERRIDE_2026-05-05.md` for decision-log conflict handling.
-5. `references/ARCHITECTURE_WORKPLAN_OVERRIDE_2026-05-05.md` for architecture-planning conflict handling.
-6. `references/TASK_BOARD_OVERRIDE_2026-05-05.md` for active task-board interpretation.
-7. `references/FILE_OWNERSHIP_OVERRIDE_2026-05-05.md` for ownership conflict handling.
-8. `references/PROJECT_FILE_INDEX_OVERRIDE_2026-05-05.md` for file-index conflict handling.
-9. `references/DOMAIN_DOCS_OVERRIDE_2026-05-05.md` for domain-doc conflict handling.
-10. `references/TASK_DOCS_OVERRIDE_2026-05-05.md` for task-doc conflict handling.
-11. `references/HANDOFFS_OVERRIDE_2026-05-05.md` for handoff conflict handling.
-12. `references/DOC_REVIEW_FINDINGS_2026-05-05.md` for known stale-doc warnings.
-13. Latest handoff for the task area as context only.
-14. Current task doc as scope/history, after override checks.
-15. `PROJECT_FILE_INDEX.md` as historical/structural context.
-16. Domain docs as business intent and historical context.
-17. `ARCHITECTURE_WORKPLAN.md`, `03_FILE_OWNERSHIP.md`, and `04_DECISIONS.md` as historical/planning context.
-18. Historical baseline/planning docs.
+3. Current root `README.md` for backend runtime and verification entrypoints.
+4. `references/PR_DERIVED_STATUS_2026-05-05.md`.
+5. `references/DECISIONS_OVERRIDE_2026-05-05.md` for decision-log conflict handling.
+6. `references/ARCHITECTURE_WORKPLAN_OVERRIDE_2026-05-05.md` for architecture-planning conflict handling.
+7. `references/TASK_BOARD_OVERRIDE_2026-05-05.md` for active task-board interpretation.
+8. `references/FILE_OWNERSHIP_OVERRIDE_2026-05-05.md` for ownership conflict handling.
+9. `references/PROJECT_FILE_INDEX_OVERRIDE_2026-05-05.md` for file-index conflict handling.
+10. `references/DOMAIN_DOCS_OVERRIDE_2026-05-05.md` for domain-doc conflict handling.
+11. `references/TASK_DOCS_OVERRIDE_2026-05-05.md` for task-doc conflict handling.
+12. `references/HANDOFFS_OVERRIDE_2026-05-05.md` for handoff conflict handling.
+13. `references/CONTRACTS_OVERRIDE_2026-05-05.md` for API-contract conflict handling.
+14. `references/REPO_SPLIT_MANIFEST_OVERRIDE_2026-05-05.md` for split-manifest conflict handling.
+15. `references/DOC_REVIEW_FINDINGS_2026-05-05.md` for known stale-doc warnings.
+16. Latest handoff for the task area as context only.
+17. Current task doc as scope/history, after override checks.
+18. `PROJECT_FILE_INDEX.md` as historical/structural context.
+19. Domain docs as business intent and historical context.
+20. Contract docs as split-era API inventory, after contract override checks.
+21. `repo-split-manifest.json` as historical export metadata only.
+22. `ARCHITECTURE_WORKPLAN.md`, `03_FILE_OWNERSHIP.md`, and `04_DECISIONS.md` as historical/planning context.
+23. Historical baseline/planning docs.
 
 ## Thread Workflow
 
@@ -47,16 +52,20 @@ Read these in order before starting implementation work:
 7. `references/DOMAIN_DOCS_OVERRIDE_2026-05-05.md` - current domain-doc conflict handling
 8. `references/TASK_DOCS_OVERRIDE_2026-05-05.md` - current task-doc conflict handling
 9. `references/HANDOFFS_OVERRIDE_2026-05-05.md` - current handoff conflict handling
-10. `references/DOC_REVIEW_FINDINGS_2026-05-05.md` - known stale-doc risks and cleanup recommendations
-11. `00_AGENT_RULES.md` - operating rules, validation, high-conflict files
-12. `ARCHITECTURE_WORKPLAN.md` - historical architecture direction; verify stale points against overrides and PRs
-13. `05_TASK_BOARD.md` - long task context; may contain older status and must be checked against PRs and override files
-14. `03_FILE_OWNERSHIP.md` - historical ownership/conflict context; check against ownership override before use
-15. `PROJECT_FILE_INDEX.md` - historical file index; check against override before use
-16. `04_DECISIONS.md` - historical decision context; check against decisions override before use
-17. `domains/<area>.md` - domain intent and historical context; check against domain override before use
-18. `tasks/<task>.md` - task scope/history; check against task override before use
-19. `handoffs/<task>.md` - thread context only; check against handoffs override before use
+10. `references/CONTRACTS_OVERRIDE_2026-05-05.md` - current API-contract conflict handling
+11. `references/REPO_SPLIT_MANIFEST_OVERRIDE_2026-05-05.md` - current repo-split manifest conflict handling
+12. `references/DOC_REVIEW_FINDINGS_2026-05-05.md` - known stale-doc risks and cleanup recommendations
+13. `00_AGENT_RULES.md` - operating rules, validation, high-conflict files
+14. `ARCHITECTURE_WORKPLAN.md` - historical architecture direction; verify stale points against overrides and PRs
+15. `05_TASK_BOARD.md` - long task context; may contain older status and must be checked against PRs and override files
+16. `03_FILE_OWNERSHIP.md` - historical ownership/conflict context; check against ownership override before use
+17. `PROJECT_FILE_INDEX.md` - historical file index; check against override before use
+18. `04_DECISIONS.md` - historical decision context; check against decisions override before use
+19. `domains/<area>.md` - domain intent and historical context; check against domain override before use
+20. `tasks/<task>.md` - task scope/history; check against task override before use
+21. `handoffs/<task>.md` - thread context only; check against handoffs override before use
+22. `contracts/<contract>.md` - split-era contract inventory; check against contracts override and current code before use
+23. `repo-split-manifest.json` - split export metadata only; check against manifest override before use
 
 For production deploy, Redis, PM2, forum gate, and security/development boundaries, read `references/OPS_SECURITY_DEV_BOUNDARY_2026-05-04.md` before changing ports, deployment commands, or storage settings.
 
@@ -90,6 +99,14 @@ Use `handoffs/` for completed-thread summaries and next-thread instructions only
 
 Read `handoffs/README.md` for the normalized handoff list and current handoff entrypoint.
 
+## Contracts
+
+Use `contracts/` for split-era API inventory only after reading `references/CONTRACTS_OVERRIDE_2026-05-05.md`. Verify current frontend callers, backend route registry, and backend handler code before treating any endpoint status, port, route owner, or response shape as current.
+
+## Split Manifest
+
+Use `repo-split-manifest.json` only as historical export metadata after reading `references/REPO_SPLIT_MANIFEST_OVERRIDE_2026-05-05.md`. Current code, PRs, root README, and override files own present-day file ownership.
+
 ## References
 
 - `references/PR_DERIVED_STATUS_2026-05-05.md` - newest PR-derived status for the backend repo
@@ -101,6 +118,8 @@ Read `handoffs/README.md` for the normalized handoff list and current handoff en
 - `references/DOMAIN_DOCS_OVERRIDE_2026-05-05.md` - current domain-doc override and conflict list
 - `references/TASK_DOCS_OVERRIDE_2026-05-05.md` - current task-doc override and conflict list
 - `references/HANDOFFS_OVERRIDE_2026-05-05.md` - current handoff override and conflict list
+- `references/CONTRACTS_OVERRIDE_2026-05-05.md` - current contract override and conflict list
+- `references/REPO_SPLIT_MANIFEST_OVERRIDE_2026-05-05.md` - current repo-split manifest override and conflict list
 - `references/DOC_REVIEW_FINDINGS_2026-05-05.md` - documentation review findings and stale-doc warning list
 - `references/OPS_SECURITY_DEV_BOUNDARY_2026-05-04.md` - production runtime chain, forum-gate security boundary, PM2 deploy rule, Redis DB boundary, and cross-origin troubleshooting notes
 - `references/HIGH_RISK_AREAS.md` - high-risk area audits
