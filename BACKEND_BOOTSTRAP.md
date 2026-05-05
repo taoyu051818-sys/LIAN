@@ -1,6 +1,6 @@
 # lian-platform-server bootstrap export
 
-This directory was generated from `lian-mobile-web-full` by:
+This directory was generated from the source repository by:
 
 ```bash
 node scripts/prepare-backend-repo-export.js outputs/lian-platform-server-export
@@ -49,4 +49,4 @@ It deliberately excludes frontend static files, local secrets/runtime-only files
 See `repo-split-manifest.json` for copied, skipped, and generated paths.
 
 Generated at: 2026-05-04T08:33:17.634Z
-Source root: /opt/lian-mobile-web
+Source root: source repository root at generation time
