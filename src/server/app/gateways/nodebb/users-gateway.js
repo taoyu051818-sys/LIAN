@@ -1,5 +1,32 @@
 import { makeNodebbClient } from "./client.js";
 
+const USER_COLLECTION_ENDPOINTS = new Map([
+  ["bookmarks", "bookmarks"],
+  ["bookmark", "bookmarks"],
+  ["saved", "bookmarks"],
+  ["upvoted", "upvoted"],
+  ["liked", "upvoted"],
+  ["likes", "upvoted"],
+  ["posts", "posts"],
+  ["topics", "topics"]
+]);
+
+function normalizeUserCollectionEndpoint(endpoint = "") {
+  const key = String(endpoint || "").trim().toLowerCase();
+  const value = USER_COLLECTION_ENDPOINTS.get(key);
+  if (!value) {
+    const error = new Error(`unsupported NodeBB user collection: ${endpoint}`);
+    error.status = 400;
+    throw error;
+  }
+  return value;
+}
+
+function userCollectionPath(userslug, collection, nodebbUid) {
+  const base = `/api/user/${encodeURIComponent(userslug)}/${collection}`;
+  return nodebbUid ? `${base}?_uid=${encodeURIComponent(String(nodebbUid))}` : base;
+}
+
 function makeNodebbUsersGateway({ client = makeNodebbClient() } = {}) {
   return {
     async getUserByUid({ uid, headers } = {}) {
@@ -37,26 +64,15 @@ function makeNodebbUsersGateway({ client = makeNodebbClient() } = {}) {
 
     async getUserCollection({ slug, endpoint, nodebbUid, headers } = {}) {
       const userslug = String(slug || "").trim();
-      const collection = String(endpoint || "").trim();
       if (!userslug) throw new Error("slug is required");
-      if (!collection) throw new Error("endpoint is required");
-      const attempts = [
-        nodebbUid ? client.withUid(`/api/user/${userslug}/${collection}`, nodebbUid) : `/api/user/${userslug}/${collection}`,
-        nodebbUid ? `/api/user/${userslug}/${collection}?_uid=${nodebbUid}` : `/api/user/${userslug}/${collection}`,
-        nodebbUid ? client.withUid(`/api/v3/users/${nodebbUid}/${collection}`, nodebbUid) : ""
-      ].filter(Boolean);
-      let lastError;
-      for (const path of attempts) {
-        try {
-          return await client.fetch(path, { headers });
-        } catch (error) {
-          lastError = error;
-          if (![404, 405, 401, 403].includes(Number(error.status))) break;
-        }
-      }
-      throw lastError;
+      const collection = normalizeUserCollectionEndpoint(endpoint);
+      return await client.fetch(userCollectionPath(userslug, collection, nodebbUid), { headers });
     }
   };
 }
 
-export { makeNodebbUsersGateway };
+export {
+  makeNodebbUsersGateway,
+  normalizeUserCollectionEndpoint,
+  userCollectionPath
+};
