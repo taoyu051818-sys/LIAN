@@ -6,8 +6,13 @@
 //   npm run verify:public
 //   LIAN_PUBLIC_BASE_URL=https://example.com npm run verify:public
 
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 const baseUrl = String(process.env.LIAN_PUBLIC_BASE_URL || "https://lian.nat100.top").replace(/\/+$/, "");
-const timeoutMs = Number(process.env.LIAN_PUBLIC_TIMEOUT_MS || 8000);
+const timeoutMs = parsePositiveInteger(process.env.LIAN_PUBLIC_TIMEOUT_MS, 8000);
 
 const checks = [
   {
