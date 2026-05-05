@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import { canReplyToPost, canViewPost } from "./audience-service.js";
+import { canViewPost } from "./audience-service.js";
 import { config } from "./config.js";
 import { memory } from "./cache.js";
 import { loadChannelReads, loadMetadata, saveChannelReadItems } from "./data-store.js";
@@ -10,6 +10,7 @@ import { nodebbFetch, withNodebbUid } from "./nodebb-client.js";
 import { readJsonBody } from "./request-utils.js";
 import { ensureNodebbUid, getCurrentUser, requireUser, selectIdentityTag } from "./auth-service.js";
 import { buildChannelMessageHtml, replyToNodebbTopic } from "./post-service.js";
+import { handleCreateReplyRefactored as handleCreateReply } from "./app/handlers/reply-handlers.js";
 
 async function markNodebbTopicRead(tid) {
   if (!tid) return;
@@ -35,7 +36,6 @@ async function handleChannel(reqUrl, req, res) {
   const limit = Math.min(80, Math.max(10, Number(reqUrl.searchParams.get("limit") || 40)));
   const offset = Math.max(0, Number(reqUrl.searchParams.get("offset") || 0));
 
-  // Resolve viewer (optional login — guest allowed)
   let viewer = null;
   try {
     const auth = await getCurrentUser(req);
@@ -52,7 +52,6 @@ async function handleChannel(reqUrl, req, res) {
   for (const topic of selectedTopics) {
     try {
       const detail = await getTopicDetail(topic.tid);
-      // Audience filter: channel is distribution surface like feed/map
       const postMeta = metadata[String(topic.tid)];
       if (postMeta && !canViewPost(viewer, { visibility: postMeta.visibility, audience: postMeta.audience }, "map")) {
         continue;
@@ -130,26 +129,6 @@ async function handleChannelMessage(req, res) {
   }
   memory.feedPages.clear();
   memory.topicDetails.clear();
-  sendJson(res, 200, data);
-}
-
-async function handleCreateReply(tid, req, res) {
-  const auth = await requireUser(req);
-  if (!config.nodebbToken) return sendJson(res, 500, { error: "LIAN API token is missing" });
-  if (auth.user.status === "limited") return sendJson(res, 403, { error: "account is limited" });
-  const metadata = await loadMetadata();
-  const postMeta = metadata[String(tid)];
-  if (postMeta && !canReplyToPost(auth.user, postMeta)) {
-    return sendJson(res, 403, { error: "access denied" });
-  }
-  const payload = await readJsonBody(req);
-  const content = String(payload.content || "").trim();
-  if (!content) return sendJson(res, 400, { error: "content is required" });
-  if (content.length > 2000) return sendJson(res, 400, { error: "content is too long" });
-  const nodebbUid = await ensureNodebbUid(auth);
-  const data = await replyToNodebbTopic(tid, content, auth.user, nodebbUid);
-  memory.feedPages.clear();
-  memory.topicDetails.delete(Number(tid));
   sendJson(res, 200, data);
 }
 
