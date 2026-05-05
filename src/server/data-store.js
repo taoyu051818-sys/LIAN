@@ -13,7 +13,8 @@ import {
   rulesPath,
   userCachePath
 } from "./paths.js";
-import { isRedisStorageEnabled, redisConfig } from "./storage/redis-client.js";
+import { areRedisObjectReadsEnabled, isRedisStorageEnabled, redisConfig } from "./storage/redis-client.js";
+import { appendRedisObjectListItem, readRedisObjectData, writeRedisObjectData } from "./storage/redis-object-store.js";
 import { KEYS, appendJsonArrayKey, readJsonKey, writeJsonKey } from "./storage/redis-store.js";
 
 const DEFAULT_RULES = { tabs: ["精选"], pinnedTids: [], tagWeights: {}, recencyHalfLifeHours: 96, coverBonus: 0 };
@@ -43,7 +44,13 @@ function redisStorageKeyForPath(filePath = "") {
 
 async function readJsonData(filePath, fallback) {
   const key = redisStorageEnabled() ? redisStorageKeyForPath(filePath) : null;
-  if (key) return await readJsonKey(key, fallback);
+  if (key) {
+    if (areRedisObjectReadsEnabled()) {
+      const objectData = await readRedisObjectData(key, fallback);
+      if (objectData !== null) return objectData;
+    }
+    return await readJsonKey(key, fallback);
+  }
   try {
     return JSON.parse(await fs.readFile(filePath, "utf8"));
   } catch {
@@ -54,6 +61,9 @@ async function readJsonData(filePath, fallback) {
 async function writeJsonFile(filePath, data) {
   const key = redisStorageEnabled() ? redisStorageKeyForPath(filePath) : null;
   if (key) {
+    if (areRedisObjectReadsEnabled()) {
+      await writeRedisObjectData(key, data);
+    }
     await writeJsonKey(key, data);
     return;
   }
@@ -68,10 +78,12 @@ async function appendJsonLine(filePath, data) {
     if (redisStorageEnabled()) {
       const base = path.basename(filePath);
       if (base === "ai-post-drafts.jsonl") {
+        if (areRedisObjectReadsEnabled()) await appendRedisObjectListItem(KEYS.aiDrafts, data);
         await appendJsonArrayKey(KEYS.aiDrafts, data);
         return;
       }
       if (base === "ai-post-records.jsonl") {
+        if (areRedisObjectReadsEnabled()) await appendRedisObjectListItem(KEYS.aiRecords, data);
         await appendJsonArrayKey(KEYS.aiRecords, data);
         return;
       }
