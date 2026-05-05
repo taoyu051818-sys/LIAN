@@ -1,13 +1,13 @@
-export { makeNodebbClient } from "./client.js";
-export { makeNodebbTopicsGateway } from "./topics-gateway.js";
-export { makeNodebbPostsGateway } from "./posts-gateway.js";
-export { makeNodebbUsersGateway } from "./users-gateway.js";
-export {
+import { makeNodebbClient } from "./client.js";
+import { makeNodebbTopicsGateway } from "./topics-gateway.js";
+import { makeNodebbPostsGateway } from "./posts-gateway.js";
+import { makeNodebbUsersGateway } from "./users-gateway.js";
+import {
   makeNodebbNotificationsGateway,
   normalizeNodebbNotification
 } from "./notifications-gateway.js";
 
-function makeNodebbGateways({ client } = {}) {
+function makeNodebbGateways({ client = makeNodebbClient() } = {}) {
   return {
     topics: makeNodebbTopicsGateway({ client }),
     posts: makeNodebbPostsGateway({ client }),
@@ -16,4 +16,12 @@ function makeNodebbGateways({ client } = {}) {
   };
 }
 
-export { makeNodebbGateways };
+export {
+  makeNodebbClient,
+  makeNodebbGateways,
+  makeNodebbNotificationsGateway,
+  makeNodebbPostsGateway,
+  makeNodebbTopicsGateway,
+  makeNodebbUsersGateway,
+  normalizeNodebbNotification
+};
