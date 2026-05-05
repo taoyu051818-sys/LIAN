@@ -40,6 +40,22 @@ function cacheControlForStatic(pathname, ext) {
   return "no-cache";
 }
 
+function isMissingFile(error) {
+  return error?.code === "ENOENT" || error?.code === "ENOTDIR";
+}
+
+async function readHtmlIndex() {
+  return fs.readFile(path.join(publicDir, "index.html"), "utf8");
+}
+
+function sendBackendOnlyFallback(res) {
+  sendJson(res, 404, {
+    error: "not_found",
+    service: "lian-platform-server",
+    message: "Frontend static assets are not bundled in this backend runtime. Use the frontend service for UI routes."
+  });
+}
+
 async function serveStatic(reqUrl, res) {
   let pathname;
   try {
@@ -66,11 +82,23 @@ async function serveStatic(reqUrl, res) {
       "cache-control": cacheControlForStatic(pathname, ext)
     }));
     res.end(data);
-  } catch {
-    const index = injectRuntimeConfig(await fs.readFile(path.join(publicDir, "index.html"), "utf8"), "/index.html");
-    const type = MIME[".html"];
-    res.writeHead(200, responseHeaders(type, { "content-type": type, "cache-control": "no-cache" }));
-    res.end(index);
+  } catch (error) {
+    if (!isMissingFile(error)) {
+      sendJson(res, 500, { error: "static_file_error" });
+      return;
+    }
+    try {
+      const index = injectRuntimeConfig(await readHtmlIndex(), "/index.html");
+      const type = MIME[".html"];
+      res.writeHead(200, responseHeaders(type, { "content-type": type, "cache-control": "no-cache" }));
+      res.end(index);
+    } catch (indexError) {
+      if (isMissingFile(indexError)) {
+        sendBackendOnlyFallback(res);
+        return;
+      }
+      sendJson(res, 500, { error: "static_index_error" });
+    }
   }
 }
 
