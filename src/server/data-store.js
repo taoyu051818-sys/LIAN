@@ -17,6 +17,7 @@ import { areRedisObjectReadsEnabled, isRedisStorageEnabled, redisConfig } from "
 import {
   appendRedisObjectListItem,
   readRedisObjectData,
+  writeRedisObjectChannelReadItem,
   writeRedisObjectData,
   writeRedisObjectPostMetadataItem,
   writeRedisObjectUserCacheEntry
@@ -180,6 +181,20 @@ async function saveChannelReads(data) {
   memory.channelReadsLoadedAt = Date.now();
 }
 
+async function saveChannelReadItems(data, eventIds = []) {
+  const ids = [...new Set(eventIds.map(String).filter(Boolean))];
+  if (redisStorageEnabled() && areRedisObjectReadsEnabled()) {
+    for (const id of ids) {
+      if (data?.items?.[id]) await writeRedisObjectChannelReadItem(id, data.items[id]);
+    }
+    await writeJsonKey(KEYS.channelReads, data);
+  } else {
+    await saveChannelReads(data);
+  }
+  memory.channelReads = data;
+  memory.channelReadsLoadedAt = Date.now();
+}
+
 function normalizeAuthStore(data = {}) {
   return {
     version: 1,
@@ -319,6 +334,7 @@ export {
   redisConfig,
   redisStorageEnabled,
   saveAuthStore,
+  saveChannelReadItems,
   saveChannelReads,
   saveUserCache,
   updateAuthStore,
