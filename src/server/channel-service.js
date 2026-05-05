@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import { canReplyToPost, canViewPost } from "./audience-service.js";
 import { config } from "./config.js";
 import { memory } from "./cache.js";
-import { loadChannelReads, loadMetadata, saveChannelReads } from "./data-store.js";
+import { loadChannelReads, loadMetadata, saveChannelReadItems } from "./data-store.js";
 import { getAllRecentTopics, getTopicDetail, normalizeChannelEvent } from "./feed-service.js";
 import { sendJson } from "./http-response.js";
 import { nodebbFetch, withNodebbUid } from "./nodebb-client.js";
@@ -89,7 +89,7 @@ async function handleChannelRead(req, res) {
     reads.items[id].readers = Array.from(readers);
     counts[id] = reads.items[id].readers.length;
   }
-  await saveChannelReads(reads);
+  await saveChannelReadItems(reads, eventIds);
   for (const tid of new Set((payload.tids || []).map(Number).filter(Number.isFinite))) {
     await markNodebbTopicRead(tid);
   }
