@@ -11,6 +11,14 @@ function stableId(value, fallback = "") {
   return crypto.createHash("sha256").update(JSON.stringify(value ?? fallback)).digest("hex");
 }
 
+function tokenHash(token = "") {
+  return crypto.createHash("sha256").update(String(token)).digest("hex");
+}
+
+function normalizeIndexValue(value = "") {
+  return String(value || "").trim().toLowerCase();
+}
+
 function parseJson(raw, fallback = null) {
   if (!raw) return fallback;
   try {
@@ -97,6 +105,90 @@ async function writeObjectFeedRules(client, data = {}) {
   await clearPattern(client, "feed:rule:*");
   for (const key of keys) await setJson(client, `feed:rule:${stableId(key)}`, { key, value: data[key] });
   await replaceSet(client, "feed:rules:keys", keys);
+}
+
+async function writeRedisObjectAuthUser(user = {}) {
+  const client = await getRedisClient();
+  const id = stableId(user.id || user.userId || user.uid || user.email || user.username);
+  if (!id) return false;
+  await setJson(client, `auth:user:${id}`, user);
+  await client.sAdd(redisKey("auth:user:ids"), id);
+  if (user.email) await client.set(redisKey(`auth:email:${stableId(normalizeIndexValue(user.email))}`), id);
+  if (user.username) await client.set(redisKey(`auth:username:${stableId(normalizeIndexValue(user.username))}`), id);
+  return true;
+}
+
+async function readRedisObjectAuthUserById(userId) {
+  const client = await getRedisClient();
+  const id = stableId(userId);
+  if (!id) return null;
+  return await getJson(client, `auth:user:${id}`, null);
+}
+
+async function readRedisObjectAuthUserByLogin(login = "") {
+  const client = await getRedisClient();
+  const value = normalizeIndexValue(login);
+  if (!value) return null;
+  const emailId = await client.get(redisKey(`auth:email:${stableId(value)}`));
+  const usernameId = emailId || await client.get(redisKey(`auth:username:${stableId(value)}`));
+  return usernameId ? await getJson(client, `auth:user:${usernameId}`, null) : null;
+}
+
+async function writeRedisObjectAuthSession(token, session = {}) {
+  const client = await getRedisClient();
+  const hash = tokenHash(token);
+  if (!token || !hash) return false;
+  await setJson(client, `auth:session:${hash}`, { tokenHash: hash, ...(session || {}) });
+  await client.sAdd(redisKey("auth:sessions"), hash);
+  return true;
+}
+
+async function readRedisObjectAuthSession(token) {
+  const client = await getRedisClient();
+  const hash = tokenHash(token);
+  if (!token || !hash) return null;
+  return await getJson(client, `auth:session:${hash}`, null);
+}
+
+async function deleteRedisObjectAuthSession(token) {
+  const client = await getRedisClient();
+  const hash = tokenHash(token);
+  if (!token || !hash) return false;
+  await client.del(redisKey(`auth:session:${hash}`));
+  await client.sRem(redisKey("auth:sessions"), hash);
+  return true;
+}
+
+async function writeRedisObjectAuthInvite(code, invite = {}) {
+  const client = await getRedisClient();
+  const key = stableId(code);
+  if (!key) return false;
+  await setJson(client, `auth:invite:${key}`, { code, ...(invite || {}) });
+  await client.sAdd(redisKey("auth:invites"), key);
+  return true;
+}
+
+async function readRedisObjectAuthInvite(code) {
+  const client = await getRedisClient();
+  const key = stableId(code);
+  if (!key) return null;
+  return await getJson(client, `auth:invite:${key}`, null);
+}
+
+async function writeRedisObjectAuthVerification(key, verification = {}) {
+  const client = await getRedisClient();
+  const indexKey = stableId(normalizeIndexValue(key));
+  if (!indexKey) return false;
+  await setJson(client, `auth:verification:${indexKey}`, { key, ...(verification || {}) });
+  await client.sAdd(redisKey("auth:verifications"), indexKey);
+  return true;
+}
+
+async function readRedisObjectAuthVerification(key) {
+  const client = await getRedisClient();
+  const indexKey = stableId(normalizeIndexValue(key));
+  if (!indexKey) return null;
+  return await getJson(client, `auth:verification:${indexKey}`, null);
 }
 
 async function readObjectChannelReads(client) {
@@ -281,7 +373,17 @@ async function writeRedisObjectData(name, data = {}) {
 
 export {
   appendRedisObjectListItem,
+  deleteRedisObjectAuthSession,
+  readRedisObjectAuthInvite,
+  readRedisObjectAuthSession,
+  readRedisObjectAuthUserById,
+  readRedisObjectAuthUserByLogin,
+  readRedisObjectAuthVerification,
   readRedisObjectData,
+  writeRedisObjectAuthInvite,
+  writeRedisObjectAuthSession,
+  writeRedisObjectAuthUser,
+  writeRedisObjectAuthVerification,
   writeRedisObjectChannelReadItem,
   writeRedisObjectData,
   writeRedisObjectPostMetadataItem,
