@@ -280,7 +280,7 @@ function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
 function verifyPassword(password, user) {
   if (!user?.password?.salt || !user?.password?.hash) return false;
   const next = hashPassword(password, user.password.salt).hash;
-  return crypto.timingSafeEqual(Buffer.from(next, "hex"), Buffer.from(user.password.hash));
+  return crypto.timingSafeEqual(Buffer.from(next, "hex"), Buffer.from(user.password.hash, "hex"));
 }
 
 function parseCookies(req) {
