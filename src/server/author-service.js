@@ -118,12 +118,16 @@ function authorFromTopic(topic = {}, post = {}) {
   };
 }
 
-async function handleAuthors(reqUrl, res) {
+function readActorUids(reqUrl) {
   const raw = reqUrl.searchParams.get("nodebbUids") || reqUrl.searchParams.get("uids") || "";
-  const uids = raw.split(",").map((item) => normalizeNodebbUid(item)).filter(Boolean).slice(0, 50);
-  const authors = await resolveAuthorsByNodebbUids(uids);
+  return raw.split(",").map((item) => normalizeNodebbUid(item)).filter(Boolean).slice(0, 50);
+}
+
+async function handleIdentityActors(reqUrl, res) {
+  const nodebbUids = readActorUids(reqUrl);
+  const actors = await resolveAuthorsByNodebbUids(nodebbUids);
   sendJson(res, 200, {
-    authors: uids.map((uid) => authors.get(uid) || fallbackAuthor(uid))
+    actors: nodebbUids.map((uid) => actors.get(uid) || fallbackAuthor(uid))
   });
 }
 
@@ -131,7 +135,7 @@ export {
   authorFromLianUser,
   authorFromTopic,
   fallbackAuthor,
-  handleAuthors,
+  handleIdentityActors,
   normalizeAvatarUrl,
   normalizeNodebbUid,
   resolveAuthorsByNodebbUids
