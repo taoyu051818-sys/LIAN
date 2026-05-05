@@ -148,6 +148,15 @@ async function writeObjectUserCache(client, data = {}) {
   await replaceSet(client, "usercache:actors", actorIds);
 }
 
+async function writeRedisObjectUserCacheEntry(userId, entry = {}) {
+  const client = await getRedisClient();
+  const key = String(userId || "").trim();
+  if (!key) return false;
+  await setJson(client, `usercache:user:${stableId(key)}`, { userId: key, ...(entry || {}) });
+  await client.sAdd(redisKey("usercache:users"), key);
+  return true;
+}
+
 async function readObjectMapLocations(client, fallback) {
   const entries = await readSetJson(client, "map:location:index", (id) => `map:location:${stableId(id)}`);
   if (!entries.length) return null;
@@ -261,4 +270,10 @@ async function writeRedisObjectData(name, data = {}) {
   return false;
 }
 
-export { appendRedisObjectListItem, readRedisObjectData, writeRedisObjectData, writeRedisObjectPostMetadataItem };
+export {
+  appendRedisObjectListItem,
+  readRedisObjectData,
+  writeRedisObjectData,
+  writeRedisObjectPostMetadataItem,
+  writeRedisObjectUserCacheEntry
+};
