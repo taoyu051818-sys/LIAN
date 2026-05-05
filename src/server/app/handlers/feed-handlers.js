@@ -1,5 +1,6 @@
 import { getCurrentUser, ensureNodebbUid } from "../../auth-service.js";
 import { loadMetadata, loadRules } from "../../data-store.js";
+import { scoreItemForInterests } from "../../interest-service.js";
 import { sendJson } from "../../http-response.js";
 import { requireAdmin } from "../../request-utils.js";
 import {
@@ -34,7 +35,7 @@ function normalizeTabs(tabs = []) {
 
 function normalizePrimaryTag(tags = [], metadata = {}) {
   const fromMetadata = String(metadata.primaryTag || metadata.tag || "").trim();
-  if (fromMetadata) return fromMetadata.replace(/^#+/, "#");
+  if (fromMetadata) return fromMetadata.startsWith("#") ? fromMetadata : `#${fromMetadata}`;
   const first = String(tags[0] || "").trim();
   return first ? (first.startsWith("#") ? first : `#${first}`) : "";
 }
@@ -155,12 +156,17 @@ function makeFeedCache() {
   };
 }
 
-function rankFeedItems(items = []) {
+function rankFeedItems(items = [], { actor } = {}) {
+  const actorInterests = Array.isArray(actor?.interests) ? actor.interests : [];
   return [...items].sort((a, b) => {
     const aMeta = a.metadata || {};
     const bMeta = b.metadata || {};
-    const aScore = Number(aMeta.priority || 0) + Number(aMeta.qualityScore || 0) * 40 + Number(aMeta.imageImpactScore || 0) * 20 - Number(aMeta.riskScore || 0) * 200;
-    const bScore = Number(bMeta.priority || 0) + Number(bMeta.qualityScore || 0) * 40 + Number(bMeta.imageImpactScore || 0) * 20 - Number(bMeta.riskScore || 0) * 200;
+    const aMapped = normalizeTopicForDomain(a.topic, aMeta);
+    const bMapped = normalizeTopicForDomain(b.topic, bMeta);
+    const aInterestScore = scoreItemForInterests(aMapped, actorInterests);
+    const bInterestScore = scoreItemForInterests(bMapped, actorInterests);
+    const aScore = Number(aMeta.priority || 0) + Number(aMeta.qualityScore || 0) * 40 + Number(aMeta.imageImpactScore || 0) * 20 - Number(aMeta.riskScore || 0) * 200 + aInterestScore * 32;
+    const bScore = Number(bMeta.priority || 0) + Number(bMeta.qualityScore || 0) * 40 + Number(bMeta.imageImpactScore || 0) * 20 - Number(bMeta.riskScore || 0) * 200 + bInterestScore * 32;
     if (bScore !== aScore) return bScore - aScore;
     return Number(b.topic?.timestamp || 0) - Number(a.topic?.timestamp || 0);
   });
