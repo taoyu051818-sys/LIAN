@@ -1,159 +1,206 @@
-# 黎安移动端 WebUI
+# LIAN Platform Server
 
-一个直接连接 NodeBB 原生 API 的移动端信息流。服务端负责保存 API token、整理推荐流、读取帖子详情、上传图片到 Cloudinary，并向前端提供 `/api/*`。
+Backend runtime for LIAN. The service connects to NodeBB, prepares the campus feed, serves post detail and map data, handles local auth/session state, uploads media through Cloudinary, and exposes `/api/*` endpoints for the web client.
 
-内容编辑、图文帖子和推荐流维护原则见 [`EDITORIAL_PRINCIPLES.md`](./EDITORIAL_PRINCIPLES.md)。所有面向学生的信息整理、NodeBB 图文帖和每日推荐批次都按这份原则执行。
+Content editing, NodeBB post preparation, and recommendation principles are documented in [`EDITORIAL_PRINCIPLES.md`](./EDITORIAL_PRINCIPLES.md).
 
-## 首次部署引导
+## Current data model
 
-如果项目目录没有 `.env`，并且启动环境里没有 `NODEBB_API_TOKEN`，第一次访问端口会进入部署引导页。
+The active runtime data model is **Redis object-native**.
 
-引导页会保存这些配置到服务器本地 `.env`：
+Legacy bulk JSON keys and the old file-backed JSON data shape were used during migration only. Normal runtime reads and writes now use Redis object keys.
 
-- `NODEBB_BASE_URL`：NodeBB 地址。同一台 Linux 服务器建议填 `http://127.0.0.1:4567`
-- `NODEBB_PUBLIC_BASE_URL`：浏览器可访问的公开地址，用于头像、正文图片和跳转链接，不能填 `127.0.0.1`
-- `NODEBB_API_TOKEN`：NodeBB API token
-- `NODEBB_UID`：默认操作用户
-- `NODEBB_CID`：默认发帖分类
-- `CLOUDINARY_URL`：需要网页上传图片发帖时填写
+Primary reference:
 
-端口 `PORT` 也会写入 `.env`，但服务已经监听后不会自动换端口。修改端口后执行：
+- [`docs/architecture/redis-object-native-data-model.md`](./docs/architecture/redis-object-native-data-model.md)
+
+Normal verification commands:
 
 ```bash
-pm2 reload lian-mobile-web --update-env
+npm run test:object-native
+npm run verify:redis
+npm run verify:redis:auth
 ```
 
-## 本地启动
-
-```powershell
-cd F:\26.3.13\lian-mobile-web
-.\scripts\start-local.ps1
-```
-
-访问：
+Expected result:
 
 ```text
-http://localhost:4100
+[verify:object-primary] object-primary data verified
+[verify:redis:auth] auth object-native indexes verified
 ```
 
-## Linux 部署
-
-先安装运行环境：
+Required runtime flags:
 
 ```bash
-sudo bash scripts/install-linux-env.sh
+LIAN_STORAGE_MODE=db
+LIAN_REDIS_OBJECT_READS=true
+LIAN_REDIS_OBJECT_PRIMARY=true
+LIAN_AUTH_OBJECT_READS=true
+LIAN_AUTH_OBJECT_NATIVE=true
 ```
 
-部署到 `/opt/lian-mobile-web` 并用 PM2 启动：
+`LIAN_AUTH_OBJECT_NATIVE=true` implies auth object reads. Auth runtime state no longer depends on `lian:auth:store`.
+
+## Redis object groups
+
+Current Redis source-of-truth groups:
+
+- Feed rules: `feed:rules:keys`, `feed:rule:*`
+- Post metadata: `postmeta:tids`, `postmeta:tid:*`
+- Channel reads: `channel:read:users`, `channel:read:user:*`
+- User cache: `usercache:users`, `usercache:user:*`, `usercache:actors`, `usercache:actor:*`
+- Map: `map:location:index`, `map:location:*`, `map:layer:bundle`, `map:layer:*`
+- Clubs: `club:index`, `club:item:*`
+- AI drafts/records: `ai:draft:index`, `ai:draft:item:*`, `ai:record:index`, `ai:record:item:*`
+- Auth: `auth:user:ids`, `auth:user:*`, `auth:email:*`, `auth:username:*`, `auth:sessions`, `auth:session:*`, `auth:invites`, `auth:invite:*`, `auth:verifications`, `auth:verification:*`
+
+Legacy bulk keys such as `lian:postmeta:items`, `lian:channel:reads`, `lian:usercache`, `lian:ai:drafts`, and `lian:auth:store` are intentionally absent from a healthy object-native runtime.
+
+## Local / server startup
+
+Install dependencies:
 
 ```bash
-bash scripts/deploy.sh
+npm install
 ```
 
-第一次打开：
+Start directly:
 
-```text
-http://服务器IP:4100
+```bash
+npm start
 ```
 
-填完引导后，后续就是正式信息流。
+Typical PM2 restart on the server:
 
-## 数据来源
+```bash
+pm2 restart lian-platform-server --update-env
+pm2 save
+```
 
-服务端直接读取 LIAN API。接口连接失败时会把错误返回给前端，避免本地缓存掩盖真实问题。
+API smoke check:
 
-## 主要接口
+```bash
+curl --max-time 10 -sS http://127.0.0.1:4200/api/feed -o /tmp/lian-feed.json
+curl --max-time 10 -sS http://127.0.0.1:4200/api/map/v2/items -o /tmp/lian-map.json
+curl --max-time 10 -sS http://127.0.0.1:4200/api/auth/me -o /tmp/lian-auth-me.json
+```
 
-- `GET /api/feed?tab=推荐&page=1&limit=12`
+`/api/auth/me` can return `{"user":null}` when no session cookie is provided. That is expected for an unauthenticated smoke check.
+
+## First setup / environment
+
+The service reads runtime configuration from `.env` and process environment variables.
+
+Important NodeBB and media settings:
+
+- `NODEBB_BASE_URL`: internal NodeBB address, usually `http://127.0.0.1:4567`
+- `NODEBB_PUBLIC_BASE_URL`: public browser-facing NodeBB address
+- `NODEBB_API_TOKEN`: NodeBB API token
+- `NODEBB_UID`: default NodeBB user id
+- `NODEBB_CID`: default NodeBB category id
+- `CLOUDINARY_URL`: required for image upload paths
+
+Important Redis settings:
+
+- `LIAN_STORAGE_MODE=db`
+- `LIAN_REDIS_HOST`, `LIAN_REDIS_PORT`, `LIAN_REDIS_DATABASE`, `LIAN_REDIS_KEY_PREFIX`
+- `LIAN_REDIS_OBJECT_READS=true`
+- `LIAN_REDIS_OBJECT_PRIMARY=true`
+- `LIAN_AUTH_OBJECT_READS=true`
+- `LIAN_AUTH_OBJECT_NATIVE=true`
+
+NodeBB uses Redis DB 1 on this server, so LIAN runtime data should stay in its configured LIAN database, currently DB 2.
+
+## Main API endpoints
+
+Common frontend endpoints:
+
+- `GET /api/feed?tab=精选&page=1&limit=12`
 - `GET /api/posts/:tid`
 - `POST /api/posts`
 - `POST /api/upload/image`
-- `GET /api/map/items`
+- `GET /api/map/v2/items`
 - `GET /api/messages`
-- `GET /api/me`
+- `GET /api/auth/me`
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `POST /api/auth/register`
 
-## 推荐流维护
+## Feed and post metadata
 
-推荐流规则在 `data/feed-rules.json`。
+Feed rules and post metadata are stored in Redis object keys, not in runtime JSON files.
 
-帖子的时效信息不使用 NodeBB 编辑时间，单独维护在 `data/post-metadata.json`：
+The major object groups are:
 
-- `timeLabel`：卡片上展示的时间
-- `startsAt`：活动或报名开始时间
-- `endsAt`：活动或报名结束时间
-- `expiresAt`：信息失效时间
-- `priority`：人工推荐加权
+- `feed:rules:keys`, `feed:rule:*`
+- `postmeta:tids`, `postmeta:tid:*`
 
-首页推荐流优先使用 `feedEditions.pages`。每一个 page 是一版已经设计好的帖子队列，例如每版 10 条。用户加载时按版请求，服务端只在这一版内部做轻微个性化调整：已读内容放到本版后面，未读内容靠前。这样每次懒加载出现的仍然是一版人工/AI 排过的内容。
+Post metadata can include:
 
-示例：
+- `timeLabel`: card display time
+- `startsAt`: activity/signup start time
+- `endsAt`: activity/signup end time
+- `expiresAt`: expiration time
+- `priority`: manual recommendation weight
+- `visibility`, `audience`, `distribution`, and related feed control fields
 
-```json
-{
-  "feedEditions": {
-    "pageSize": 10,
-    "generatedAt": "2026-04-28T09:00:00+08:00",
-    "strategy": "daily-curated-batches",
-    "notes": ["第一版：今天最该看的信息", "第二版：活动和可收藏信息"],
-    "pages": [
-      [92, 91, 90, 89, 88, 87, 86, 85, 84, 83],
-      [82, 81, 80, 79, 78, 77, 76, 75, 74, 73]
-    ]
-  }
-}
-```
+## Auth/session model
 
-## 隐藏管理接口
+Auth is object-native. Runtime login/session state uses:
 
-管理接口需要 `ADMIN_TOKEN`，可以在首次部署引导里填写；留空时会自动生成并写入 `.env`。
+- user objects: `auth:user:*`
+- login indexes: `auth:email:*`, `auth:username:*`
+- session objects: `auth:session:*`
+- session index: `auth:sessions`
+- invite objects: `auth:invite:*`
+- verification objects: `auth:verification:*`
 
-读取推荐规则：
+Session object keys use the SHA-256 hash of the raw session token. The raw token only travels in the browser cookie/request path.
 
-```bash
-curl -H "Authorization: Bearer $ADMIN_TOKEN" \
-  http://127.0.0.1:4100/api/admin/feed-rules
-```
+## Tests and checks
 
-覆盖推荐规则：
+General structure and encoding checks:
 
 ```bash
-curl -X PUT \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  --data @data/feed-rules.json \
-  http://127.0.0.1:4100/api/admin/feed-rules
+npm run check
 ```
 
-只更新每日推荐版面：
+Node tests:
 
 ```bash
-curl -X PUT \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"pageSize":10,"notes":["第一版：今天最该看的信息"],"pages":[[92,91,90,89,88,87,86,85,84,83]]}' \
-  http://127.0.0.1:4100/api/admin/feed-edition
+npm test
+npm run test:routes
 ```
 
-读取帖子时效信息：
+Redis object-native runtime checks:
 
 ```bash
-curl -H "Authorization: Bearer $ADMIN_TOKEN" \
-  http://127.0.0.1:4100/api/admin/post-metadata
+npm run test:object-native
+npm run verify:redis
+npm run verify:redis:auth
 ```
 
-更新单条帖子的时效信息：
+## Legacy migration tools
+
+Legacy migration scripts are archived under `scripts/legacy/` and exposed as `legacy:*` npm scripts.
+
+They are historical tools only and are not part of normal development verification. On an object-native dataset, old bulk verifiers may fail because the legacy bulk keys are intentionally absent.
+
+Available legacy commands:
 
 ```bash
-curl -X PATCH \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"timeLabel":"今天 19:30","startsAt":"2026-04-28T19:30:00+08:00","expiresAt":"2026-04-29T00:00:00+08:00","priority":20}' \
-  http://127.0.0.1:4100/api/admin/post-metadata/123
+npm run legacy:migrate:bulk
+npm run legacy:migrate:objects
+npm run legacy:verify:bulk
+npm run legacy:verify:bulk:prod
+npm run legacy:verify:objects
+npm run legacy:cleanup:bulk
+npm run legacy:test:objects
+npm run legacy:test:auth
 ```
 
-清缓存：
+## Hidden ops/admin endpoints
 
-```bash
-curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" \
-  http://127.0.0.1:4100/api/admin/reload
-```
+Ops/admin endpoints are exposed through the backend and protected by the configured deployment/admin settings. Use `ops.html` and the configured ops flow for deploy/restart/update actions.
+
+For Redis runtime verification, prefer the object-native commands above instead of legacy bulk checks.
