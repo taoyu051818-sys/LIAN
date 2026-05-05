@@ -17,23 +17,24 @@ import { readJsonBody } from "./request-utils.js";
 import { ensureNodebbUid, requireUser, selectIdentityTag } from "./auth-service.js";
 import { findUserAlias } from "./alias-service.js";
 
-function userSignature(user, alias = null) {
+function userSignature(user, alias = null, identityTag = "") {
   if (!user) return "";
   const displayName = alias?.name || user.username || "同学";
-  const tags = Array.isArray(user.tags) && user.tags.length ? `｜${user.tags.join(" ")}` : "";
-  return `\n\n<p style="color:#69706b;font-size:13px">来自 ${escapeHtml(displayName)}${escapeHtml(tags)}</p>`;
+  const signal = identityTag ? `｜${identityTag}` : "";
+  return `\n\n<p style="color:#69706b;font-size:13px">来自 ${escapeHtml(displayName)}${escapeHtml(signal)}</p>`;
 }
 
 function buildLianUserMeta(user = {}, identityTag = "", alias = null) {
   if (!user?.id) return "";
   const displayName = alias?.name || user.username || "";
+  const selectedIdentityTag = selectIdentityTag(user, identityTag);
   const meta = {
     userId: user.id,
     nodebbUid: user.nodebbUid || null,
     username: displayName,
     aliasId: alias?.id || "",
     aliasName: alias?.name || "",
-    identityTag: identityTag || selectIdentityTag(user),
+    identityTag: selectedIdentityTag,
     avatarText: String(displayName || "同").slice(0, 1),
     avatarUrl: alias ? (alias.avatarUrl || "") : (user.avatarUrl || user.nodebbPicture || ""),
     sentAt: new Date().toISOString()
@@ -56,7 +57,8 @@ function buildChannelMessageHtml(content, user, identityTag) {
 
 function buildTopicHtml(payload) {
   const blocks = [];
-  if (payload.currentUser) blocks.push(buildLianUserMeta(payload.currentUser, "", payload.alias || null));
+  const identityTag = selectIdentityTag(payload.currentUser || {}, payload.identityTag || "");
+  if (payload.currentUser) blocks.push(buildLianUserMeta(payload.currentUser, identityTag, payload.alias || null));
   const imageUrls = Array.isArray(payload.imageUrls) && payload.imageUrls.length
     ? payload.imageUrls
     : [payload.imageUrl].filter(Boolean);
@@ -64,7 +66,7 @@ function buildTopicHtml(payload) {
     const imageUrl = normalizePostImageUrl(rawImageUrl, { width: 1200 });
     blocks.push(`<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(payload.title || "cover")}" style="max-width:100%;height:auto" />`);
   }
-  if (payload.tag) blocks.push(`<p><strong>#${escapeHtml(payload.tag)}</strong></p>`);
+  if (payload.tag) blocks.push(`<p><strong>${escapeHtml(String(payload.tag).startsWith("#") ? payload.tag : `#${payload.tag}`)}</strong></p>`);
   const content = String(payload.content || "")
     .split(/\n{2,}/)
     .map((part) => part.trim())
@@ -78,7 +80,7 @@ function buildTopicHtml(payload) {
   if (payload.mapLocation && typeof payload.mapLocation === "object") {
     blocks.push(`<!-- lian-map-location ${escapeHtml(JSON.stringify(payload.mapLocation))} -->`);
   }
-  return `${blocks.join("\n\n").trim()}${userSignature(payload.currentUser, payload.alias || null)}`.trim();
+  return `${blocks.join("\n\n").trim()}${userSignature(payload.currentUser, payload.alias || null, identityTag)}`.trim();
 }
 
 function buildMapMetadataPatch(mapLocation = {}) {
@@ -158,7 +160,7 @@ async function createNodebbTopicFromPayload(auth, payload = {}, options = {}) {
     alias
   });
   const tags = Array.isArray(payload.tags) && payload.tags.length
-    ? payload.tags
+    ? payload.tags.slice(0, 1)
     : (payload.tag ? [payload.tag] : undefined);
   const body = {
     cid: Number(payload.cid || config.nodebbCid),
@@ -412,7 +414,6 @@ async function fetchUserPosts(nodebbUid, endpoint) {
     console.warn(`[fetchUserPosts] no slug for uid=${nodebbUid}`);
     return [];
   }
-  // Try multiple endpoint patterns since NodeBB API shape varies by version
   const attempts = [
     withNodebbUid(`/api/user/${slug}/${endpoint}`, nodebbUid),
     `/api/user/${slug}/${endpoint}?_uid=${nodebbUid}`,
@@ -432,11 +433,7 @@ async function fetchUserPosts(nodebbUid, endpoint) {
         : [];
       console.info(`[fetchUserPosts] keys=${Object.keys(data || {}).join(",")} topics=${topics.length}`);
       if (topics.length) return topics;
-      // If empty, try next endpoint (might be wrong endpoint)
-      if (topics.length === 0 && attempts.indexOf(url) < attempts.length - 1) {
-        console.info(`[fetchUserPosts] empty result, trying next endpoint`);
-        continue;
-      }
+      if (topics.length === 0 && attempts.indexOf(url) < attempts.length - 1) continue;
       return topics;
     } catch (error) {
       lastError = error;
@@ -444,7 +441,7 @@ async function fetchUserPosts(nodebbUid, endpoint) {
       if (![404, 405, 401, 403].includes(Number(error.status))) break;
     }
   }
-  console.warn(`[fetchUserPosts] all attempts failed for uid=${nodebbUid} endpoint=${endpoint}`);
+  console.warn(`[fetchUserPosts] all attempts failed for uid=${nodebbUid} endpoint=${endpoint}`, lastError?.message || "");
   return [];
 }
 
@@ -469,21 +466,13 @@ async function handleGetSavedPosts(req, res) {
   try {
     await loadUserCache();
     const topics = await fetchUserPosts(nodebbUid, "bookmarks");
-    console.info(`[saved] uid=${nodebbUid} raw topics: ${topics.length}`);
-    // Extract tids and sync to cache
     let tids = topics.map((t) => Number(t.tid)).filter(Boolean);
     if (tids.length) {
       const cache = await loadUserCache();
-      cache.users[auth.user.id] = {
-        ...(cache.users[auth.user.id] || {}),
-        savedTids: tids,
-        updatedAt: new Date().toISOString()
-      };
+      cache.users[auth.user.id] = { ...(cache.users[auth.user.id] || {}), savedTids: tids, updatedAt: new Date().toISOString() };
       saveUserCache(cache).catch(() => {});
     }
-    // Fallback to cached tids if endpoint returned empty
     if (!tids.length) tids = getUserSavedTids(auth.user.id);
-    // Fetch full topic details for each tid (bookmarks endpoint lacks title/cover)
     const metadata = await loadMetadata();
     const items = [];
     for (const tid of tids.slice(0, 50)) {
@@ -492,12 +481,10 @@ async function handleGetSavedPosts(req, res) {
       try {
         const detail = await nodebbFetch(withNodebbUid(`/api/topic/${tid}`, nodebbUid));
         items.push(normalizeProfileTopic(detail, metadata));
-      } catch { /* skip inaccessible */ }
+      } catch {}
     }
-    console.info(`[saved] items: ${items.length}`);
     sendJson(res, 200, { items });
   } catch (error) {
-    console.warn(`[saved] error:`, error.message);
     sendJson(res, error.status || 500, { error: error.message });
   }
 }
@@ -508,21 +495,13 @@ async function handleGetLikedPosts(req, res) {
   try {
     await loadUserCache();
     const topics = await fetchUserPosts(nodebbUid, "upvoted");
-    console.info(`[liked] uid=${nodebbUid} raw topics: ${topics.length}`);
-    // Extract tids and sync to cache
     let tids = topics.map((t) => Number(t.tid)).filter(Boolean);
     if (tids.length) {
       const cache = await loadUserCache();
-      cache.users[auth.user.id] = {
-        ...(cache.users[auth.user.id] || {}),
-        likedTids: tids,
-        updatedAt: new Date().toISOString()
-      };
+      cache.users[auth.user.id] = { ...(cache.users[auth.user.id] || {}), likedTids: tids, updatedAt: new Date().toISOString() };
       saveUserCache(cache).catch(() => {});
     }
-    // Fallback to cached tids if endpoint returned empty
     if (!tids.length) tids = getUserLikedTids(auth.user.id);
-    // Fetch full topic details for each tid (upvoted endpoint lacks title/cover)
     const metadata = await loadMetadata();
     const items = [];
     for (const tid of tids.slice(0, 50)) {
@@ -531,12 +510,10 @@ async function handleGetLikedPosts(req, res) {
       try {
         const detail = await nodebbFetch(withNodebbUid(`/api/topic/${tid}`, nodebbUid));
         items.push(normalizeProfileTopic(detail, metadata));
-      } catch { /* skip inaccessible */ }
+      } catch {}
     }
-    console.info(`[liked] items: ${items.length}`);
     sendJson(res, 200, { items });
   } catch (error) {
-    console.warn(`[liked] error:`, error.message);
     sendJson(res, error.status || 500, { error: error.message });
   }
 }
@@ -556,9 +533,7 @@ async function handleGetHistory(req, res) {
       try {
         const detail = await nodebbFetch(withNodebbUid(`/api/topic/${tid}`, nodebbUid));
         items.push(normalizeProfileTopic(detail, metadata));
-      } catch {
-        // skip inaccessible topics
-      }
+      } catch {}
     }
     sendJson(res, 200, { items });
   } catch (error) {
@@ -568,32 +543,23 @@ async function handleGetHistory(req, res) {
 
 async function handleCreatePost(req, res) {
   const auth = await requireUser(req);
-  if (!config.nodebbToken) {
-    sendJson(res, 500, { error: "LIAN API token is missing" });
-    return;
-  }
+  if (!config.nodebbToken) return sendJson(res, 500, { error: "LIAN API token is missing" });
   if (auth.user.status === "limited") return sendJson(res, 403, { error: "account is limited" });
   const payload = await readJsonBody(req);
   const title = String(payload.title || "").trim();
-  if (!title) {
-    sendJson(res, 400, { error: "title is required" });
-    return;
-  }
+  if (!title) return sendJson(res, 400, { error: "title is required" });
   const audience = normalizeAudienceForCreate(auth.user, payload.audience, payload.visibility || "public");
-  if (!canCreatePostWithAudience(auth.user, audience)) {
-    return sendJson(res, 403, { error: "audience is not allowed" });
-  }
+  if (!canCreatePostWithAudience(auth.user, audience)) return sendJson(res, 403, { error: "audience is not allowed" });
   const visibility = metadataVisibilityFromAudience(audience);
-  const { data, tid, imageUrls } = await createNodebbTopicFromPayload(auth, {
-    ...payload,
-    title
-  });
+  const { data, tid, imageUrls } = await createNodebbTopicFromPayload(auth, { ...payload, title });
   if (tid) {
     await patchPostMetadata(tid, {
       title,
       imageUrls,
       visibility,
       audience,
+      primaryTag: String(payload.tag || payload.primaryTag || "").trim(),
+      identityTag: selectIdentityTag(auth.user, payload.identityTag || ""),
       ...buildMapMetadataPatch(payload.mapLocation)
     });
   }
@@ -602,8 +568,6 @@ async function handleCreatePost(req, res) {
   sendJson(res, 200, data);
 }
 
-
-
 async function replyToNodebbTopic(tid, content, user = null, nodebbUid = null) {
   const html = String(content || "").trim().startsWith("<!-- lian-channel-meta")
     ? String(content || "").trim()
@@ -611,10 +575,7 @@ async function replyToNodebbTopic(tid, content, user = null, nodebbUid = null) {
   const body = { content: html };
   const options = {
     method: "POST",
-    headers: {
-      "content-type": "application/json; charset=utf-8",
-      authorization: `Bearer ${config.nodebbToken}`
-    },
+    headers: { "content-type": "application/json; charset=utf-8", authorization: `Bearer ${config.nodebbToken}` },
     body: JSON.stringify(body)
   };
   const attempts = [
