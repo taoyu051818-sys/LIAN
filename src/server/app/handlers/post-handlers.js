@@ -1,0 +1,486 @@
+import { config } from "../../config.js";
+import { memory } from "../../cache.js";
+import {
+  buildTextPostHtml,
+  escapeHtml,
+  extractCover,
+  normalizePostImageUrl,
+  proxiedPostImageUrl,
+  warmupPostImages
+} from "../../content-utils.js";
+import {
+  loadMetadata,
+  patchPostMetadata,
+  recordUserLike,
+  recordUserSave,
+  getUserLikedTids,
+  getUserSavedTids,
+  loadUserCache,
+  saveUserCache
+} from "../../data-store.js";
+import { sendJson } from "../../http-response.js";
+import { nodebbFetch, withNodebbUid } from "../../nodebb-client.js";
+import { readJsonBody } from "../../request-utils.js";
+import { ensureNodebbUid, requireUser, selectIdentityTag } from "../../auth-service.js";
+import { findUserAlias } from "../../alias-service.js";
+import { makeNodebbGateways } from "../gateways/nodebb/index.js";
+import { makeAudiencePolicy } from "../policies/audience-policy.js";
+import { makeInteractionPolicy } from "../policies/interaction-policy.js";
+import { makePublishPolicy } from "../policies/publish-policy.js";
+import { makeTogglePostLikeUseCase } from "../usecases/posts/toggle-post-like.js";
+import { makeTogglePostBookmarkUseCase } from "../usecases/posts/toggle-post-bookmark.js";
+import { makeReportPostUseCase } from "../usecases/posts/report-post.js";
+import { makeCreateReplyUseCase } from "../usecases/posts/create-reply.js";
+import { makeCreatePostUseCase } from "../usecases/posts/create-post.js";
+import { makeGetSavedPostsUseCase } from "../usecases/profile/get-saved-posts.js";
+import { makeGetLikedPostsUseCase } from "../usecases/profile/get-liked-posts.js";
+import { makeGetHistoryPostsUseCase } from "../usecases/profile/get-history-posts.js";
+
+function jsonBearerHeaders() {
+  return {
+    "content-type": "application/json; charset=utf-8",
+    authorization: `Bearer ${config.nodebbToken}`
+  };
+}
+
+function userSignature(user, alias = null) {
+  if (!user) return "";
+  const displayName = alias?.name || user.username || "同学";
+  const tags = Array.isArray(user.tags) && user.tags.length ? `｜${user.tags.join(" ")}` : "";
+  return `\n\n<p style="color:#69706b;font-size:13px">来自 ${escapeHtml(displayName)}${escapeHtml(tags)}</p>`;
+}
+
+function buildLianUserMeta(user = {}, identityTag = "", alias = null) {
+  if (!user?.id) return "";
+  const displayName = alias?.name || user.username || "";
+  const meta = {
+    userId: user.id,
+    nodebbUid: user.nodebbUid || null,
+    username: displayName,
+    aliasId: alias?.id || "",
+    aliasName: alias?.name || "",
+    identityTag: identityTag || selectIdentityTag(user),
+    avatarText: String(displayName || "同").slice(0, 1),
+    avatarUrl: alias ? (alias.avatarUrl || "") : (user.avatarUrl || user.nodebbPicture || ""),
+    sentAt: new Date().toISOString()
+  };
+  return `<!-- lian-user-meta ${escapeHtml(JSON.stringify(meta))} -->`;
+}
+
+function buildTopicHtml(payload) {
+  const blocks = [];
+  if (payload.currentUser) blocks.push(buildLianUserMeta(payload.currentUser, "", payload.alias || null));
+  const imageUrls = Array.isArray(payload.imageUrls) && payload.imageUrls.length
+    ? payload.imageUrls
+    : [payload.imageUrl].filter(Boolean);
+  for (const rawImageUrl of imageUrls) {
+    const imageUrl = normalizePostImageUrl(rawImageUrl, { width: 1200 });
+    blocks.push(`<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(payload.title || "cover")}" style="max-width:100%;height:auto" />`);
+  }
+  if (payload.tag) blocks.push(`<p><strong>#${escapeHtml(payload.tag)}</strong></p>`);
+  const content = String(payload.content || "")
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => `<p>${escapeHtml(part).replace(/\n/g, "<br>")}</p>`);
+  blocks.push(...content);
+  if (payload.placeName || (payload.lat && payload.lng)) {
+    const place = [payload.placeName, payload.lat && payload.lng ? `${payload.lat}, ${payload.lng}` : ""].filter(Boolean).join(" ");
+    blocks.push(`<p>地点：${escapeHtml(place)}</p>`);
+  }
+  if (payload.mapLocation && typeof payload.mapLocation === "object") {
+    blocks.push(`<!-- lian-map-location ${escapeHtml(JSON.stringify(payload.mapLocation))} -->`);
+  }
+  return `${blocks.join("\n\n").trim()}${userSignature(payload.currentUser, payload.alias || null)}`.trim();
+}
+
+function buildMapMetadataPatch(mapLocation = {}) {
+  if (!mapLocation || typeof mapLocation !== "object") return {};
+  const lat = Number(mapLocation.lat);
+  const lng = Number(mapLocation.lng);
+  const hasLatLng = Number.isFinite(lat) && Number.isFinite(lng);
+  const x = Number(mapLocation.x);
+  const y = Number(mapLocation.y);
+  const hasLegacyPoint = Number.isFinite(x) && Number.isFinite(y);
+  if (!hasLatLng && !hasLegacyPoint && !mapLocation.placeName) return {};
+  return {
+    locationArea: String(mapLocation.placeName || "").trim(),
+    lat: hasLatLng ? lat : undefined,
+    lng: hasLatLng ? lng : undefined,
+    mapVersion: hasLatLng ? "gaode_v2" : "legacy",
+    locationDraft: {
+      source: hasLatLng ? "map_v2" : "legacy_map",
+      locationId: "",
+      locationArea: String(mapLocation.placeName || "").trim(),
+      displayName: String(mapLocation.placeName || "").trim(),
+      lat: hasLatLng ? lat : null,
+      lng: hasLatLng ? lng : null,
+      legacyPoint: { x: hasLegacyPoint ? x : null, y: hasLegacyPoint ? y : null },
+      imagePoint: { x: hasLegacyPoint ? x : null, y: hasLegacyPoint ? y : null },
+      mapVersion: hasLatLng ? "gaode_v2" : "legacy",
+      confidence: hasLatLng ? 0.72 : (hasLegacyPoint ? 0.65 : 0.4),
+      skipped: false,
+      note: ""
+    }
+  };
+}
+
+function metadataVisibilityFromAudience(audience = {}) {
+  return audience.linkOnly ? "linkOnly" : (audience.visibility || "public");
+}
+
+function normalizeProfileTopic(topic, metadata = {}) {
+  const tid = Number(topic.tid || 0);
+  const meta = metadata[String(tid)] || {};
+  const title = topic.titleRaw || topic.title || meta.title || "未命名";
+  const timestampISO = topic.timestampISO || topic.lastposttimeISO || "";
+  const contentHtml = topic.posts?.[0]?.content || topic.teaser?.content || "";
+  const cover = meta.imageUrls?.[0]
+    ? proxiedPostImageUrl(meta.imageUrls[0], { width: 400 })
+    : extractCover(contentHtml);
+  return {
+    tid,
+    title,
+    cover,
+    timestampISO,
+    visibility: meta.visibility || "public",
+    audience: meta.audience || null,
+    author: topic.user?.username || topic.author?.username || "同学"
+  };
+}
+
+function makePostRepository() {
+  return {
+    async getByTid(tid) {
+      const metadata = await loadMetadata();
+      return metadata[String(tid)] || {};
+    },
+    async listByTids(tids = []) {
+      const metadata = await loadMetadata();
+      return Object.fromEntries(tids.map((tid) => [String(tid), metadata[String(tid)] || {}]));
+    },
+    async patchByTid(tid, patch) {
+      return await patchPostMetadata(tid, patch);
+    }
+  };
+}
+
+function makeCacheAdapter() {
+  return {
+    async get() { return null; },
+    async set() {},
+    invalidateTopic(tid) { memory.topicDetails.delete(Number(tid)); },
+    invalidateFeed() { memory.feedPages.clear(); },
+    touchTopic() {}
+  };
+}
+
+function makeNodebbDeps() {
+  const base = makeNodebbGateways();
+  return {
+    topics: {
+      ...base.topics,
+      createTopic: (args) => base.topics.createTopic({ ...args, headers: jsonBearerHeaders() }),
+      createReply: (args) => base.topics.createReply({ ...args, headers: jsonBearerHeaders() }),
+      markRead: (args) => base.topics.markRead({ ...args, headers: jsonBearerHeaders() })
+    },
+    posts: {
+      ...base.posts,
+      votePost: (args) => base.posts.votePost({ ...args, headers: jsonBearerHeaders() }),
+      unvotePost: (args) => base.posts.unvotePost({ ...args, headers: jsonBearerHeaders() }),
+      bookmarkPost: async (args) => {
+        try { return await base.posts.bookmarkPost({ ...args, headers: jsonBearerHeaders() }); }
+        catch (error) {
+          const msg = String(error.message || "").toLowerCase();
+          if (msg.includes("already bookmarked") || msg.includes("already saved")) return {};
+          throw error;
+        }
+      },
+      unbookmarkPost: async (args) => {
+        try { return await base.posts.unbookmarkPost({ ...args, headers: jsonBearerHeaders() }); }
+        catch (error) {
+          const msg = String(error.message || "").toLowerCase();
+          if (msg.includes("not bookmarked") || msg.includes("not saved")) return {};
+          throw error;
+        }
+      },
+      flagPost: (args) => base.posts.flagPost({ ...args, headers: jsonBearerHeaders() })
+    },
+    users: base.users,
+    notifications: base.notifications
+  };
+}
+
+function makeCommonDeps() {
+  return {
+    nodebb: makeNodebbDeps(),
+    audiencePolicy: makeAudiencePolicy(),
+    interactionPolicy: makeInteractionPolicy(),
+    publishPolicy: makePublishPolicy(),
+    postRepository: makePostRepository(),
+    cache: makeCacheAdapter()
+  };
+}
+
+async function handleTogglePostLikeRefactored(tid, req, res) {
+  try {
+    const auth = await requireUser(req);
+    if (!config.nodebbToken) return sendJson(res, 500, { error: "LIAN API token is missing" });
+    const payload = await readJsonBody(req).catch(() => ({}));
+    const nodebbUid = await ensureNodebbUid(auth);
+    const deps = makeCommonDeps();
+    const result = await makeTogglePostLikeUseCase({
+      nodebbTopics: deps.nodebb.topics,
+      nodebbPosts: deps.nodebb.posts,
+      audiencePolicy: deps.audiencePolicy,
+      interactionPolicy: deps.interactionPolicy,
+      postRepository: deps.postRepository,
+      userInteractionRepository: {
+        recordLike: (actorId, topicId, liked) => recordUserLike(actorId, topicId, liked)
+      },
+      cache: deps.cache
+    }).execute({ actor: auth.user, tid, nodebbUid, desiredLiked: payload.liked });
+    sendJson(res, 200, result);
+  } catch (error) {
+    sendJson(res, error.status || 500, { error: error.message });
+  }
+}
+
+async function handleTogglePostSaveRefactored(tid, req, res) {
+  try {
+    const auth = await requireUser(req);
+    if (!config.nodebbToken) return sendJson(res, 500, { error: "LIAN API token is missing" });
+    const payload = await readJsonBody(req).catch(() => ({}));
+    const nodebbUid = await ensureNodebbUid(auth);
+    const deps = makeCommonDeps();
+    const result = await makeTogglePostBookmarkUseCase({
+      nodebbTopics: deps.nodebb.topics,
+      nodebbPosts: deps.nodebb.posts,
+      audiencePolicy: deps.audiencePolicy,
+      interactionPolicy: deps.interactionPolicy,
+      postRepository: deps.postRepository,
+      userInteractionRepository: {
+        recordSave: (actorId, topicId, saved) => recordUserSave(actorId, topicId, saved)
+      },
+      cache: deps.cache
+    }).execute({ actor: auth.user, tid, nodebbUid, desiredSaved: payload.saved });
+    sendJson(res, 200, result);
+  } catch (error) {
+    sendJson(res, error.status || 500, { error: error.message });
+  }
+}
+
+async function handleReportPostRefactored(tid, req, res) {
+  try {
+    const auth = await requireUser(req);
+    if (!config.nodebbToken) return sendJson(res, 500, { error: "LIAN API token is missing" });
+    const payload = await readJsonBody(req).catch(() => ({}));
+    const nodebbUid = await ensureNodebbUid(auth);
+    const deps = makeCommonDeps();
+    const result = await makeReportPostUseCase({
+      nodebbTopics: deps.nodebb.topics,
+      nodebbPosts: deps.nodebb.posts,
+      audiencePolicy: deps.audiencePolicy,
+      interactionPolicy: deps.interactionPolicy,
+      postRepository: deps.postRepository,
+      reportRepository: { recordReport: async () => {} },
+      cache: deps.cache
+    }).execute({ actor: auth.user, tid, nodebbUid, reason: payload.reason || payload.category });
+    sendJson(res, 200, { ok: true, tid: result.tid, pid: result.pid });
+  } catch (error) {
+    sendJson(res, error.status || 500, { error: error.message });
+  }
+}
+
+async function handleCreatePostRefactored(req, res) {
+  try {
+    const auth = await requireUser(req);
+    if (!config.nodebbToken) return sendJson(res, 500, { error: "LIAN API token is missing" });
+    const payload = await readJsonBody(req);
+    const title = String(payload.title || "").trim();
+    if (!title) return sendJson(res, 400, { error: "title is required" });
+
+    const nodebbUid = await ensureNodebbUid(auth);
+    const aliasId = String(payload.aliasId || "").trim();
+    const alias = aliasId ? findUserAlias(auth.user, aliasId) : null;
+    if (aliasId && !alias) return sendJson(res, 400, { error: "aliasId is invalid or does not belong to current user" });
+
+    const imageUrls = Array.isArray(payload.imageUrls) && payload.imageUrls.length
+      ? payload.imageUrls.map((url) => normalizePostImageUrl(url, { width: 1200 })).filter(Boolean)
+      : (payload.imageUrl ? [normalizePostImageUrl(payload.imageUrl, { width: 1200 })] : []);
+    const audience = makeAudiencePolicy().normalizeForCreate(auth.user, payload.audience, payload.visibility || "public");
+    const visibility = metadataVisibilityFromAudience(audience);
+    const content = buildTopicHtml({
+      ...payload,
+      title,
+      imageUrls,
+      imageUrl: imageUrls[0] || "",
+      currentUser: auth.user,
+      alias
+    });
+    const tags = Array.isArray(payload.tags) && payload.tags.length ? payload.tags : (payload.tag ? [payload.tag] : []);
+    const deps = makeCommonDeps();
+    const result = await makeCreatePostUseCase({
+      nodebbTopics: deps.nodebb.topics,
+      publishPolicy: deps.publishPolicy,
+      audiencePolicy: deps.audiencePolicy,
+      postRepository: deps.postRepository,
+      cache: deps.cache
+    }).execute({
+      actor: auth.user,
+      nodebbUid,
+      payload: {
+        ...payload,
+        title,
+        content,
+        cid: Number(payload.cid || config.nodebbCid),
+        tags,
+        audience,
+        metadata: {
+          title,
+          imageUrls,
+          visibility,
+          audience,
+          ...buildMapMetadataPatch(payload.mapLocation)
+        }
+      }
+    });
+    if (imageUrls.length) await warmupPostImages(imageUrls);
+    sendJson(res, 200, result.topic);
+  } catch (error) {
+    sendJson(res, error.status || 500, { error: error.message });
+  }
+}
+
+async function getUserSlug(nodebbUid) {
+  try {
+    const data = await nodebbFetch(`/api/user/uid/${nodebbUid}`);
+    return data?.userslug || data?.slug || "";
+  } catch {
+    return "";
+  }
+}
+
+async function hydrateProfileItems(items, auth, nodebbUid) {
+  const metadata = await loadMetadata();
+  const output = [];
+  for (const item of items.slice(0, 50)) {
+    const tid = Number(item.tid || item.topic?.tid || item.topicId || item.id || 0) || 0;
+    if (!tid) continue;
+    const meta = metadata[String(tid)] || {};
+    if (!makeAudiencePolicy().canView(auth.user, { visibility: meta.visibility, audience: meta.audience })) continue;
+    try {
+      const detail = await nodebbFetch(withNodebbUid(`/api/topic/${tid}`, nodebbUid));
+      output.push(normalizeProfileTopic(detail, metadata));
+    } catch {
+      output.push(normalizeProfileTopic({ ...item, tid }, metadata));
+    }
+  }
+  return output;
+}
+
+async function handleGetSavedPostsRefactored(req, res) {
+  try {
+    const auth = await requireUser(req);
+    const nodebbUid = await ensureNodebbUid(auth);
+    const slug = await getUserSlug(nodebbUid);
+    const deps = makeCommonDeps();
+    const result = await makeGetSavedPostsUseCase({
+      nodebbUsers: deps.nodebb.users,
+      postRepository: deps.postRepository,
+      audiencePolicy: deps.audiencePolicy,
+      cache: deps.cache
+    }).execute({ actor: auth.user, slug, nodebbUid });
+    let items = result.items;
+    if (items.length) {
+      const tids = items.map((item) => Number(item.tid || item.topic?.tid)).filter(Boolean);
+      const cache = await loadUserCache();
+      cache.users[auth.user.id] = { ...(cache.users[auth.user.id] || {}), savedTids: tids, updatedAt: new Date().toISOString() };
+      saveUserCache(cache).catch(() => {});
+    } else {
+      items = getUserSavedTids(auth.user.id).map((tid) => ({ tid }));
+    }
+    sendJson(res, 200, { items: await hydrateProfileItems(items, auth, nodebbUid) });
+  } catch (error) {
+    sendJson(res, error.status || 500, { error: error.message });
+  }
+}
+
+async function handleGetLikedPostsRefactored(req, res) {
+  try {
+    const auth = await requireUser(req);
+    const nodebbUid = await ensureNodebbUid(auth);
+    const slug = await getUserSlug(nodebbUid);
+    const deps = makeCommonDeps();
+    const result = await makeGetLikedPostsUseCase({
+      nodebbUsers: deps.nodebb.users,
+      postRepository: deps.postRepository,
+      audiencePolicy: deps.audiencePolicy,
+      cache: deps.cache
+    }).execute({ actor: auth.user, slug, nodebbUid });
+    let items = result.items;
+    if (items.length) {
+      const tids = items.map((item) => Number(item.tid || item.topic?.tid)).filter(Boolean);
+      const cache = await loadUserCache();
+      cache.users[auth.user.id] = { ...(cache.users[auth.user.id] || {}), likedTids: tids, updatedAt: new Date().toISOString() };
+      saveUserCache(cache).catch(() => {});
+    } else {
+      items = getUserLikedTids(auth.user.id).map((tid) => ({ tid }));
+    }
+    sendJson(res, 200, { items: await hydrateProfileItems(items, auth, nodebbUid) });
+  } catch (error) {
+    sendJson(res, error.status || 500, { error: error.message });
+  }
+}
+
+async function handleGetHistoryRefactored(req, res) {
+  try {
+    const auth = await requireUser(req);
+    const nodebbUid = await ensureNodebbUid(auth);
+    const payload = await readJsonBody(req).catch(() => ({}));
+    const tids = Array.isArray(payload.tids) ? payload.tids.map(Number).filter(Boolean) : [];
+    if (!tids.length) return sendJson(res, 200, { items: [] });
+    const deps = makeCommonDeps();
+    const result = await makeGetHistoryPostsUseCase({
+      historyRepository: { listByActor: async () => tids.map((tid) => ({ tid })) },
+      postRepository: deps.postRepository,
+      audiencePolicy: deps.audiencePolicy,
+      cache: deps.cache
+    }).execute({ actor: auth.user, limit: 50 });
+    sendJson(res, 200, { items: await hydrateProfileItems(result.items, auth, nodebbUid) });
+  } catch (error) {
+    sendJson(res, error.status || 500, { error: error.message });
+  }
+}
+
+async function replyToNodebbTopicRefactored(tid, content, user = null, nodebbUid = null) {
+  const html = String(content || "").trim().startsWith("<!-- lian-channel-meta")
+    ? String(content || "").trim()
+    : `${buildLianUserMeta(user)}\n${buildTextPostHtml(content)}${userSignature(user)}`.trim();
+  const deps = makeCommonDeps();
+  const result = await makeCreateReplyUseCase({
+    nodebbTopics: deps.nodebb.topics,
+    audiencePolicy: { assertCanView: () => true },
+    interactionPolicy: { assertCanReply: () => true },
+    postRepository: { getByTid: async () => ({}) },
+    replyRepository: { recordReply: async () => {} },
+    cache: deps.cache
+  }).execute({
+    actor: user || { id: "system" },
+    tid,
+    nodebbUid: nodebbUid || config.nodebbUid,
+    payload: { content: html }
+  });
+  return result.reply;
+}
+
+export {
+  handleCreatePostRefactored,
+  handleGetHistoryRefactored,
+  handleGetLikedPostsRefactored,
+  handleGetSavedPostsRefactored,
+  handleReportPostRefactored,
+  handleTogglePostLikeRefactored,
+  handleTogglePostSaveRefactored,
+  replyToNodebbTopicRefactored
+};
