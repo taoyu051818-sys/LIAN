@@ -17,6 +17,7 @@ import { areRedisObjectReadsEnabled, isRedisStorageEnabled, redisConfig } from "
 import {
   appendRedisObjectListItem,
   readRedisObjectData,
+  writeRedisObjectAuthStore,
   writeRedisObjectChannelReadItem,
   writeRedisObjectData,
   writeRedisObjectPostMetadataItem,
@@ -210,9 +211,20 @@ async function loadAuthStore() {
   return normalizeAuthStore(data || {});
 }
 
+async function writeAuthStoreSnapshot(normalized) {
+  if (redisStorageEnabled()) {
+    if (areRedisObjectReadsEnabled()) {
+      await writeRedisObjectAuthStore(normalized);
+    }
+    await writeJsonKey(KEYS.authStore, normalized);
+    return;
+  }
+  await writeJsonFile(authUsersPath, normalized);
+}
+
 async function saveAuthStore(data) {
   const normalized = normalizeAuthStore(data);
-  authWriteQueue = authWriteQueue.then(() => writeJsonFile(authUsersPath, normalized));
+  authWriteQueue = authWriteQueue.then(() => writeAuthStoreSnapshot(normalized));
   return authWriteQueue;
 }
 
@@ -220,7 +232,7 @@ async function updateAuthStore(mutator) {
   authWriteQueue = authWriteQueue.then(async () => {
     const store = await loadAuthStore();
     const result = await mutator(store);
-    await writeJsonFile(authUsersPath, store);
+    await writeAuthStoreSnapshot(store);
     return result;
   });
   return authWriteQueue;
