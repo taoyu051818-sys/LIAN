@@ -8,6 +8,8 @@ const app = express();
 const PORT = 18080;
 const HOST = '127.0.0.1';
 const TARGET = 'http://127.0.0.1:4300';
+const BACKEND_TARGET = process.env.LIAN_BACKEND_TARGET || 'http://127.0.0.1:4200';
+const DEPLOY_WEBHOOK_PATH = '/api/ops/deploy-webhook';
 
 const ANSWER = String(process.env.ANSWER || '').trim();
 const COOKIE_NAME = 'forum_gate';
@@ -122,6 +124,29 @@ app.get('/gate-logout', (req, res) => {
   res.redirect('/gate-login');
 });
 
+const deployWebhookProxy = createProxyMiddleware({
+  target: BACKEND_TARGET,
+  changeOrigin: true,
+  ws: false,
+  xfwd: true,
+  proxyTimeout: 3600000,
+  timeout: 3600000,
+  pathRewrite: () => DEPLOY_WEBHOOK_PATH,
+  onError: function(err, req, res) {
+    console.error('Deploy webhook proxy error:', err.message);
+    if (!res.headersSent) {
+      res.status(502).send('Deploy webhook service is not available.');
+    }
+  }
+});
+
+app.use(DEPLOY_WEBHOOK_PATH, (req, res, next) => {
+  if (req.method !== 'POST') {
+    return res.status(405).send('method not allowed');
+  }
+  return deployWebhookProxy(req, res, next);
+});
+
 app.use((req, res, next) => {
   if (
     req.path === '/gate-login' ||
@@ -161,6 +186,7 @@ const server = http.createServer(app);
 server.listen(PORT, HOST, () => {
   console.log(`Forum gate running at http://${HOST}:${PORT}`);
   console.log(`Proxy target: ${TARGET}`);
+  console.log(`Deploy webhook target: ${BACKEND_TARGET}`);
 });
 
 // 防止某些环境下进程异常空闲退出
