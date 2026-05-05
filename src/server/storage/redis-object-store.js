@@ -75,6 +75,15 @@ async function writeObjectPostMetadata(client, data = {}) {
   await replaceSet(client, "postmeta:tids", tids);
 }
 
+async function writeRedisObjectPostMetadataItem(tid, metadata = {}) {
+  const client = await getRedisClient();
+  const key = String(Number(tid) || tid || "");
+  if (!key) return false;
+  await setJson(client, `postmeta:tid:${stableId(key)}`, { tid: key, ...(metadata || {}) });
+  await client.sAdd(redisKey("postmeta:tids"), key);
+  return true;
+}
+
 async function readObjectFeedRules(client) {
   const entries = await readSetJson(client, "feed:rules:keys", (key) => `feed:rule:${stableId(key)}`);
   if (!entries.length) return null;
@@ -252,4 +261,4 @@ async function writeRedisObjectData(name, data = {}) {
   return false;
 }
 
-export { appendRedisObjectListItem, readRedisObjectData, writeRedisObjectData };
+export { appendRedisObjectListItem, readRedisObjectData, writeRedisObjectData, writeRedisObjectPostMetadataItem };
