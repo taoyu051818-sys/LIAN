@@ -40,6 +40,7 @@ import {
   handleTogglePostSaveRefactored as handleTogglePostSave
 } from "./app/handlers/post-handlers.js";
 import { requireSameOrigin } from "./request-security.js";
+import { buildRouteManifest } from "./route-manifest.js";
 import { matchRoute } from "./route-matcher.js";
 import { isProductionMode, securityModeName } from "./security-mode.js";
 import { readJsonBody, requireAdmin } from "./request-utils.js";
@@ -90,6 +91,8 @@ async function dispatchRoute(route, req, reqUrl, res) {
     }
     case "ops-health":
       return await handleOpsHealth(req, reqUrl, res);
+    case "ops-routes":
+      return sendJson(res, 200, buildRouteManifest());
     case "ops-action":
       return await handleOpsAction(req, reqUrl, res);
     case "ops-deploy-webhook":
@@ -180,6 +183,7 @@ const PRE_SETUP_ROUTE_IDS = new Set([
   "setup-status",
   "setup",
   "ops-health",
+  "ops-routes",
   "ops-action",
   "ops-deploy-webhook",
   "internal-task-board",
