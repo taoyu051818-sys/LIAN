@@ -1,5 +1,4 @@
 import { config } from "../../config.js";
-import { memory } from "../../cache.js";
 import {
   buildTextPostHtml,
   escapeHtml,
@@ -23,6 +22,7 @@ import { nodebbFetch, withNodebbUid } from "../../nodebb-client.js";
 import { readJsonBody } from "../../request-utils.js";
 import { ensureNodebbUid, requireUser, selectIdentityTag } from "../../auth-service.js";
 import { findUserAlias } from "../../alias-service.js";
+import { makeCacheAdapter } from "../adapters/cache-adapter.js";
 import { makeNodebbGateways } from "../gateways/nodebb/index.js";
 import { makeAudiencePolicy } from "../policies/audience-policy.js";
 import { makeInteractionPolicy } from "../policies/interaction-policy.js";
@@ -162,16 +162,6 @@ function makePostRepository() {
     async patchByTid(tid, patch) {
       return await patchPostMetadata(tid, patch);
     }
-  };
-}
-
-function makeCacheAdapter() {
-  return {
-    async get() { return null; },
-    async set() {},
-    invalidateTopic(tid) { memory.topicDetails.delete(Number(tid)); },
-    invalidateFeed() { memory.feedPages.clear(); },
-    touchTopic() {}
   };
 }
 
