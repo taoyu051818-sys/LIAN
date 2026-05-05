@@ -1,8 +1,8 @@
 import { config } from "./config.js";
 
-function addUid(url) {
+function addUid(url, uid = config.nodebbUid) {
   if (url.searchParams.has("_uid")) return url;
-  url.searchParams.set("_uid", String(config.nodebbUid));
+  url.searchParams.set("_uid", String(uid || config.nodebbUid));
   return url;
 }
 
@@ -12,8 +12,28 @@ function withNodebbUid(apiPath, uid) {
   return `${url.pathname}${url.search}`;
 }
 
+function withJsonHeaders(options = {}) {
+  return {
+    ...options,
+    headers: {
+      "content-type": "application/json",
+      ...options.headers
+    }
+  };
+}
+
+function withBearerAuth(options = {}) {
+  return {
+    ...options,
+    headers: {
+      authorization: `Bearer ${config.nodebbToken}`,
+      ...options.headers
+    }
+  };
+}
+
 async function nodebbFetch(apiPath, options = {}) {
-  const url = addUid(new URL(apiPath, config.nodebbBaseUrl));
+  const url = addUid(new URL(apiPath, config.nodebbBaseUrl), options.uid);
   const headers = {
     accept: "application/json",
     connection: "close",
@@ -23,9 +43,12 @@ async function nodebbFetch(apiPath, options = {}) {
     headers["x-api-token"] = config.nodebbToken;
   }
 
+  const fetchOptions = { ...options, headers };
+  delete fetchOptions.uid;
+
   let response;
   try {
-    response = await fetch(url, { ...options, headers });
+    response = await fetch(url, fetchOptions);
   } catch (cause) {
     const error = new Error(`LIAN API connection failed: ${url.origin}${url.pathname} - ${cause.message || cause}`);
     error.status = 502;
@@ -51,6 +74,37 @@ async function nodebbFetch(apiPath, options = {}) {
   }
 
   return data;
+}
+
+async function nodebbFetchJson(apiPath, options = {}) {
+  return nodebbFetch(apiPath, withJsonHeaders(options));
+}
+
+async function nodebbFetchBearer(apiPath, options = {}) {
+  return nodebbFetch(apiPath, withBearerAuth(options));
+}
+
+async function nodebbFetchBearerJson(apiPath, options = {}) {
+  return nodebbFetch(apiPath, withBearerAuth(withJsonHeaders(options)));
+}
+
+async function nodebbFetchResult(apiPath, options = {}) {
+  try {
+    const data = await nodebbFetch(apiPath, options);
+    return { ok: true, status: 200, data, url: withNodebbUid(apiPath, options.uid) };
+  } catch (error) {
+    return {
+      ok: false,
+      status: error.status || 500,
+      data: error.data || { error: error.message },
+      url: withNodebbUid(apiPath, options.uid),
+      error
+    };
+  }
+}
+
+async function nodebbFetchBearerResult(apiPath, options = {}) {
+  return nodebbFetchResult(apiPath, withBearerAuth(options));
 }
 
 function delay(ms) {
@@ -91,4 +145,14 @@ async function fetchNodebbTopicIndex(maxPages = 8) {
   return topics;
 }
 
-export { fetchNodebbTopicIndex, nodebbFetch, retryApi, withNodebbUid };
+export {
+  fetchNodebbTopicIndex,
+  nodebbFetch,
+  nodebbFetchBearer,
+  nodebbFetchBearerJson,
+  nodebbFetchBearerResult,
+  nodebbFetchJson,
+  nodebbFetchResult,
+  retryApi,
+  withNodebbUid
+};
