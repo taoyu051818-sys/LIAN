@@ -341,7 +341,7 @@ async function writeBackendReadme(manifest) {
   const content = [
     "# lian-platform-server bootstrap export",
     "",
-    "This directory was generated from `lian-mobile-web-full` by:",
+    "This directory was generated from the source repository by:",
     "",
     "```bash",
     `node scripts/prepare-backend-repo-export.js ${targetArg}`,
