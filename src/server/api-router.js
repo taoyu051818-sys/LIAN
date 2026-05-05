@@ -21,11 +21,15 @@ import { memory } from "./cache.js";
 import { handleChannel, handleChannelMessage, handleChannelRead, handleCreateReply } from "./channel-service.js";
 import { handleMessages } from "./notification-service.js";
 import { config, isSetupRequired, saveSetupConfig } from "./config.js";
-import { handleFeed, handleFeedDebug, handlePostDetail } from "./feed-service.js";
 import { sendJson } from "./http-response.js";
 import { handleMapV2Items } from "./map-v2-service.js";
 import { nodebbFetch } from "./nodebb-client.js";
 import { handleOpsAction, handleOpsHealth } from "./ops-service.js";
+import {
+  handleFeedDebugRefactored as handleFeedDebug,
+  handleFeedRefactored as handleFeed,
+  handlePostDetailRefactored as handlePostDetail
+} from "./app/handlers/feed-handlers.js";
 import {
   handleCreatePostRefactored as handleCreatePost,
   handleGetHistoryRefactored as handleGetHistory,
