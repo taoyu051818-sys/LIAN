@@ -17,7 +17,7 @@ function loadEnv() {
       const m = line.match(/^([^#=]+)=(.*)$/);
       if (m) {
         const key = m[1].trim();
-        let val = m[2].trim().replace(/^["']|["']$/g, "");
+        const val = m[2].trim().replace(/^["']|["']$/g, "");
         if (!process.env[key]) process.env[key] = val;
       }
     }
@@ -25,9 +25,15 @@ function loadEnv() {
 }
 loadEnv();
 
-const BASE = (process.env.NODEBB_BASE_URL || "http://149.104.21.74:4567").replace(/\/$/, "");
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const BASE = (process.env.NODEBB_BASE_URL || "http://149.104.21.74:4567").replace(/\/+$/, "");
 const TOKEN = process.env.NODEBB_API_TOKEN || "";
-const NODEBB_UID = process.env.NODEBB_UID || "2";
+const NODEBB_UID = String(parsePositiveInteger(process.env.NODEBB_UID, 2));
+const NODEBB_CID = parsePositiveInteger(process.env.NODEBB_CID, 2);
 const AUTH_PATH = path.join(ROOT, "data", "auth-users.json");
 const META_PATH = path.join(ROOT, "data", "post-metadata.json");
 const TEST_PASSWORD = "Test@2026";
@@ -475,7 +481,7 @@ async function main() {
       const result = await bbFetch(`/api/v3/topics?_uid=${nodebbUid}`, {
         method: "POST",
         body: JSON.stringify({
-          cid: Number(process.env.NODEBB_CID || 2),
+          cid: NODEBB_CID,
           title: post.title,
           content: `<p>${post.content}</p>`
         })
