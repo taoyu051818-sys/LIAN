@@ -12,6 +12,8 @@
     "nodebb"
   ],
   "scripts": {
+    "audit:feed-images": "node scripts/audit-feed-image-coverage.js",
+    "audit:feed-images:strict": "node scripts/audit-feed-image-coverage.js --min-coverage=0.8",
     "check": "node scripts/validate-backend-structure.js && node scripts/check-encoding-contamination.js",
     "check:backend": "node scripts/validate-backend-structure.js",
     "check:encoding": "node scripts/check-encoding-contamination.js",
