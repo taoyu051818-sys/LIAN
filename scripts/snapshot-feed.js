@@ -33,7 +33,7 @@ function parseArgs(argv) {
     if (arg === "--tabs") args.tabs = String(argv[++index] || "").split(",").map((item) => item.trim()).filter(Boolean);
     if (arg === "--diff") args.diff = { before: argv[++index], after: argv[++index] };
   }
-  args.baseUrl = args.baseUrl.replace(/\/$/, "");
+  args.baseUrl = args.baseUrl.replace(/\/+$/, "");
   return args;
 }
 
