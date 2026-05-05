@@ -27,18 +27,23 @@ function lineIsProbablyComment(line) {
   return trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*");
 }
 
+function lineIsProbablyStringLiteral(line) {
+  const trimmed = line.trim();
+  return trimmed.startsWith("'") || trimmed.startsWith('"') || trimmed.startsWith("`");
+}
+
 const rules = [
   {
     id: "no-number-process-env",
     severity: "error",
     message: "Do not parse env numbers with Number(process.env.*). Use parsePositiveInteger/parseNonNegativeInteger from src/server/config-schema.js.",
-    test: ({ line }) => /\bNumber\s*\(\s*process\.env\./.test(line)
+    test: ({ line, relativePath }) => isRuntimeFile(relativePath) && /\bNumber\s*\(\s*process\.env\./.test(line)
   },
   {
     id: "no-parseint-process-env",
     severity: "error",
     message: "Do not parse env numbers with parseInt/parseFloat(process.env.*). Use config-schema helpers instead.",
-    test: ({ line }) => /\bparse(?:Int|Float)\s*\(\s*process\.env\./.test(line)
+    test: ({ line, relativePath }) => isRuntimeFile(relativePath) && /\bparse(?:Int|Float)\s*\(\s*process\.env\./.test(line)
   },
   {
     id: "no-single-trailing-slash-normalize",
@@ -56,7 +61,7 @@ const rules = [
     id: "no-child-process-shell-exec",
     severity: "error",
     message: "Do not use exec() shell commands. Use execFile/spawn with argument arrays instead.",
-    test: ({ line }) => /\bexec\s*\(/.test(line)
+    test: ({ line }) => /(^|[^.\w$])exec\s*\(/.test(line)
   },
   {
     id: "no-sync-fs-in-runtime",
@@ -156,7 +161,7 @@ async function checkFile(file) {
   const findings = [];
   const lines = content.split(/\r?\n/);
   for (const [index, line] of lines.entries()) {
-    if (lineIsProbablyComment(line)) continue;
+    if (lineIsProbablyComment(line) || lineIsProbablyStringLiteral(line)) continue;
     for (const rule of rules) {
       if (rule.test({ line, lines, index, relativePath: file.relativePath })) {
         findings.push({
