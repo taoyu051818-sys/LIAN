@@ -30,9 +30,14 @@ const DEFAULT_METADATA_FILE = { items: {} };
 const DEFAULT_CHANNEL_READS = { version: 1, items: {} };
 const DEFAULT_USER_CACHE = { version: 1, users: {}, actors: {} };
 const OBJECT_PRIMARY_BULK_SKIP_KEYS = new Set([
+  KEYS.rules,
   KEYS.metadata,
   KEYS.channelReads,
   KEYS.userCache,
+  KEYS.mapLocations,
+  KEYS.mapLayers,
+  KEYS.aliasPool,
+  KEYS.clubs,
   KEYS.aiDrafts,
   KEYS.aiRecords
 ]);
