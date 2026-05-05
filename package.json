@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "LIAN backend runtime using the Redis object-native data model",
+  "keywords": [
+    "lian",
+    "backend",
+    "redis",
+    "object-native",
+    "nodebb"
+  ],
   "scripts": {
     "check": "node scripts/validate-backend-structure.js && node scripts/check-encoding-contamination.js",
     "check:backend": "node scripts/validate-backend-structure.js",
@@ -25,8 +33,32 @@
     "verify:redis:objects": "node scripts/verify-redis-object-primary.js",
     "verify:redis:prod": "node scripts/verify-redis-object-primary.js"
   },
+  "lian": {
+    "dataModel": "redis-object-native",
+    "docs": [
+      "README.md",
+      "docs/architecture/redis-object-native-data-model.md"
+    ],
+    "redis": {
+      "runtime": "Redis object keys are the source of truth for normal reads and writes.",
+      "legacyBulkKeys": "Legacy bulk JSON keys are intentionally absent from a healthy object-native runtime.",
+      "primaryVerificationScripts": [
+        "test:object-native",
+        "verify:redis",
+        "verify:redis:auth"
+      ],
+      "legacyScriptsPrefix": "legacy:*",
+      "legacyScriptsPurpose": "Historical migration and bulk-verification helpers only; do not use for normal runtime verification.",
+      "requiredEnv": {
+        "LIAN_STORAGE_MODE": "db",
+        "LIAN_REDIS_OBJECT_READS": "true",
+        "LIAN_REDIS_OBJECT_PRIMARY": "true",
+        "LIAN_AUTH_OBJECT_READS": "true",
+        "LIAN_AUTH_OBJECT_NATIVE": "true"
+      }
+    }
+  },
   "dependencies": {
     "redis": "^4.7.0"
-  },
-  "description": "Backend runtime for LIAN"
+  }
 }
