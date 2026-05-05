@@ -1,4 +1,5 @@
 const DEFAULT_ALLOWED_IMAGE_HOSTS = ["res.cloudinary.com"];
+const DEFAULT_ALLOWED_CLOUDINARY_CLOUDS = ["dhvyvfu4n"];
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
 function configuredAllowedHosts() {
@@ -7,6 +8,16 @@ function configuredAllowedHosts() {
     ...String(process.env.LIAN_IMAGE_PROXY_ALLOWED_HOSTS || "")
       .split(",")
       .map((host) => host.trim().toLowerCase())
+      .filter(Boolean)
+  ]);
+}
+
+function configuredAllowedCloudinaryClouds() {
+  return new Set([
+    ...DEFAULT_ALLOWED_CLOUDINARY_CLOUDS,
+    ...String(process.env.LIAN_IMAGE_PROXY_ALLOWED_CLOUDINARY_CLOUDS || "")
+      .split(",")
+      .map((cloudName) => cloudName.trim().toLowerCase())
       .filter(Boolean)
   ]);
 }
@@ -25,8 +36,10 @@ function hostnameIsBlocked(hostname = "") {
 }
 
 function isAllowedCloudinaryImageUrl(url) {
-  return url.hostname === "res.cloudinary.com" &&
-    /^\/[^/]+\/image\/upload\//.test(url.pathname);
+  if (url.hostname !== "res.cloudinary.com") return false;
+  const match = url.pathname.match(/^\/([^/]+)\/image\/upload\//);
+  if (!match) return false;
+  return configuredAllowedCloudinaryClouds().has(match[1].toLowerCase());
 }
 
 function isAllowedConfiguredImageUrl(url) {
@@ -38,7 +51,7 @@ function isAllowedImageUrl(value = "") {
     const url = new URL(String(value || ""));
     if (url.protocol !== "https:") return false;
     if (hostnameIsBlocked(url.hostname)) return false;
-    if (isAllowedCloudinaryImageUrl(url)) return true;
+    if (url.hostname === "res.cloudinary.com") return isAllowedCloudinaryImageUrl(url);
     return isAllowedConfiguredImageUrl(url);
   } catch {
     return false;
