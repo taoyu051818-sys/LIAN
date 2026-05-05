@@ -2,38 +2,16 @@
 
 // Creates 10 test users, 3 orgs, and 15 test posts for audience system testing.
 // Usage: node scripts/setup-audience-test.js
-// Requires: NODEBB_BASE_URL, NODEBB_API_TOKEN, NODEBB_UID in .env or environment
+// Requires completed backend NodeBB configuration in .env or environment.
 
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
+import { config } from "../src/server/config.js";
+import { nodebbFetchBearerJson } from "../src/server/nodebb-client.js";
+
 const ROOT = path.resolve(import.meta.dirname, "..");
-
-function loadEnv() {
-  try {
-    const text = fs.readFileSync(path.join(ROOT, ".env"), "utf8");
-    for (const line of text.split(/\r?\n/)) {
-      const m = line.match(/^([^#=]+)=(.*)$/);
-      if (m) {
-        const key = m[1].trim();
-        const val = m[2].trim().replace(/^["']|["']$/g, "");
-        if (!process.env[key]) process.env[key] = val;
-      }
-    }
-  } catch {}
-}
-loadEnv();
-
-function parsePositiveInteger(value, fallback) {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-const BASE = (process.env.NODEBB_BASE_URL || "http://149.104.21.74:4567").replace(/\/+$/, "");
-const TOKEN = process.env.NODEBB_API_TOKEN || "";
-const NODEBB_UID = String(parsePositiveInteger(process.env.NODEBB_UID, 2));
-const NODEBB_CID = parsePositiveInteger(process.env.NODEBB_CID, 2);
 const AUTH_PATH = path.join(ROOT, "data", "auth-users.json");
 const META_PATH = path.join(ROOT, "data", "post-metadata.json");
 const TEST_PASSWORD = "Test@2026";
@@ -44,32 +22,12 @@ function hashPassword(pw) {
   return { salt, hash };
 }
 
-async function bbFetch(apiPath, options = {}) {
-  const url = new URL(apiPath, BASE);
-  url.searchParams.set("_uid", NODEBB_UID);
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      accept: "application/json",
-      "content-type": "application/json",
-      authorization: `Bearer ${TOKEN}`,
-      ...options.headers
-    },
-    signal: options.signal || AbortSignal.timeout(10000)
-  });
-  const text = await res.text();
-  let data;
-  try { data = JSON.parse(text); } catch { data = { raw: text }; }
-  if (!res.ok) throw new Error(`${res.status}: ${text.slice(0, 200)}`);
-  return data;
-}
-
 function loadJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
 function saveJson(filePath, data) {
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n", "utf8");
+  fs.writeFileSync(filePath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
 }
 
 const INST_SCHOOL_MAP = {
@@ -209,7 +167,6 @@ const TEST_USERS = [
 
 function buildTestPosts(userMap) {
   const u = (tag) => userMap[tag];
-  const uid = (tag) => u(tag)?.id || "";
 
   return [
     // === 公开与校园 ===
@@ -365,8 +322,8 @@ function buildTestPosts(userMap) {
 // --- Main ---
 
 async function main() {
-  if (!TOKEN) {
-    console.error("错误: NODEBB_API_TOKEN 未设置。请在 .env 中配置。");
+  if (!config.nodebbToken) {
+    console.error("错误: NodeBB token 未设置。请先完成后端 .env 配置。");
     process.exit(1);
   }
 
@@ -379,7 +336,7 @@ async function main() {
   // 1. Create test users
   console.log("▶ 创建测试用户...");
   for (const def of TEST_USERS) {
-    const existing = authStore.users.find((u) => u.username === def.username);
+    const existing = authStore.users.find((user) => user.username === def.username);
     if (existing) {
       console.log(`  ${def.displayName}(${def.tag}): 已存在 (${existing.id})`);
       userMap[def.tag] = existing;
@@ -406,17 +363,17 @@ async function main() {
 
   // Set admin role
   for (const def of TEST_USERS) {
-    const u = userMap[def.tag];
-    if (!u) continue;
-    if (def.makeAdmin && !u.roleIds) {
-      u.roleIds = ["admin"];
+    const user = userMap[def.tag];
+    if (!user) continue;
+    if (def.makeAdmin && !user.roleIds) {
+      user.roleIds = ["admin"];
       console.log(`  ${def.displayName}: 设置 roleIds=["admin"]`);
     }
     // Derive schoolId
-    if (u.institution && !u.schoolId) {
-      u.schoolId = INST_SCHOOL_MAP[u.institution] || "";
+    if (user.institution && !user.schoolId) {
+      user.schoolId = INST_SCHOOL_MAP[user.institution] || "";
     }
-    if (!u.orgIds) u.orgIds = def.orgIds || [];
+    if (!user.orgIds) user.orgIds = def.orgIds || [];
   }
 
   saveJson(AUTH_PATH, authStore);
@@ -435,7 +392,7 @@ async function main() {
     }
 
     // Check if post already exists
-    const existingEntry = Object.entries(metadata).find(([, m]) => m.title === post.title);
+    const existingEntry = Object.entries(metadata).find(([, meta]) => meta.title === post.title);
     if (existingEntry) {
       const [tid] = existingEntry;
       createdTids[post.tag] = Number(tid);
@@ -447,11 +404,11 @@ async function main() {
     let nodebbUid = author.nodebbUid;
     if (!nodebbUid) {
       try {
-        const userData = await bbFetch(`/api/user/username/${author.username}`);
+        const userData = await nodebbFetchBearerJson(`/api/user/username/${author.username}`);
         nodebbUid = userData?.uid;
       } catch {
         try {
-          const created = await bbFetch("/api/v1/users", {
+          const created = await nodebbFetchBearerJson("/api/v1/users", {
             method: "POST",
             body: JSON.stringify({
               username: author.username,
@@ -460,14 +417,14 @@ async function main() {
             })
           });
           nodebbUid = created?.uid || created?.payload?.uid;
-        } catch (e) {
-          console.log(`  ${post.tag}「${post.title}」: 无法创建 NodeBB 用户 - ${e.message}`);
+        } catch (error) {
+          console.log(`  ${post.tag}「${post.title}」: 无法创建 NodeBB 用户 - ${error.message}`);
           continue;
         }
       }
       if (nodebbUid) {
         author.nodebbUid = nodebbUid;
-        const stored = authStore.users.find((u) => u.id === author.id);
+        const stored = authStore.users.find((user) => user.id === author.id);
         if (stored) stored.nodebbUid = nodebbUid;
       }
     }
@@ -478,10 +435,11 @@ async function main() {
     }
 
     try {
-      const result = await bbFetch(`/api/v3/topics?_uid=${nodebbUid}`, {
+      const result = await nodebbFetchBearerJson("/api/v3/topics", {
+        uid: nodebbUid,
         method: "POST",
         body: JSON.stringify({
-          cid: NODEBB_CID,
+          cid: config.nodebbCid,
           title: post.title,
           content: `<p>${post.content}</p>`
         })
@@ -511,14 +469,14 @@ async function main() {
       metadata[String(tid)] = metaEntry;
 
       console.log(`  ${post.tag}「${post.title}」: 创建成功 (tid ${tid})`);
-    } catch (e) {
-      console.log(`  ${post.tag}「${post.title}」: 失败 - ${e.message}`);
+    } catch (error) {
+      console.log(`  ${post.tag}「${post.title}」: 失败 - ${error.message}`);
     }
   }
 
   // Update T11 private post userIds to target U1
-  if (createdTids["T11"] && userMap["U1-linxiaoyu"]) {
-    const tid = String(createdTids["T11"]);
+  if (createdTids.T11 && userMap["U1-linxiaoyu"]) {
+    const tid = String(createdTids.T11);
     if (metadata[tid]?.audience) {
       metadata[tid].audience.userIds = [userMap["U1-linxiaoyu"].id];
       console.log(`  T11: 设置 userIds=[${userMap["U1-linxiaoyu"].id}] (${userMap["U1-linxiaoyu"].username})`);
@@ -533,8 +491,8 @@ async function main() {
   console.log("=== 测试环境就绪 ===\n");
   console.log("用户:");
   for (const def of TEST_USERS) {
-    const u = userMap[def.tag];
-    console.log(`  ${def.displayName.padEnd(6)} ${def.tag.padEnd(18)} schoolId=${(u?.schoolId || "—").padEnd(8)} orgIds=${JSON.stringify(u?.orgIds || [])} roleIds=${JSON.stringify(u?.roleIds || [])}`);
+    const user = userMap[def.tag];
+    console.log(`  ${def.displayName.padEnd(6)} ${def.tag.padEnd(18)} schoolId=${(user?.schoolId || "—").padEnd(8)} orgIds=${JSON.stringify(user?.orgIds || [])} roleIds=${JSON.stringify(user?.roleIds || [])}`);
   }
   console.log("\n帖子:");
   for (const post of testPosts) {
@@ -542,7 +500,7 @@ async function main() {
     const vis = post.audience?.linkOnly ? "linkOnly" : post.visibility;
     const extra = post.audience?.orgIds?.length ? ` org=${post.audience.orgIds.join(",")}`
       : post.audience?.schoolIds?.length ? ` school=${post.audience.schoolIds.join(",")}`
-      : post.audience?.userIds?.length ? ` private`
+      : post.audience?.userIds?.length ? " private"
       : "";
     console.log(`  ${post.tag.padEnd(4)} tid=${String(tid || "?").padEnd(5)} ${vis.padEnd(10)}${extra} 「${post.title}」`);
   }
@@ -552,7 +510,7 @@ async function main() {
   console.log("  2. 运行测试: node scripts/test-audience.js");
 }
 
-main().catch((e) => {
-  console.error("致命错误:", e.message);
+main().catch((error) => {
+  console.error("致命错误:", error.message);
   process.exit(1);
 });
