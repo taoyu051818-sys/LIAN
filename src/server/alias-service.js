@@ -5,8 +5,8 @@ import { memory } from "./cache.js";
 import { aliasPoolPath } from "./paths.js";
 import { sendJson } from "./http-response.js";
 import { readJsonBody } from "./request-utils.js";
-import { requireUser, publicAuthUser } from "./auth-service.js";
-import { loadAuthStore, saveAuthStore } from "./data-store.js";
+import { requireUser } from "./auth-service.js";
+import { saveAuthStore } from "./data-store.js";
 import { writeRedisObjectAuthUser } from "./storage/redis-object-store.js";
 
 const MAX_ALIASES_PER_USER = 1;
@@ -19,7 +19,7 @@ async function saveAuthUserMutation(auth) {
   if (authObjectNativeEnabled()) {
     await writeRedisObjectAuthUser(auth.user);
   } else {
-    await saveAuthUserMutation(auth);
+    await saveAuthStore(auth.store);
   }
 }
 
@@ -65,8 +65,6 @@ function normalizeAlias(alias = {}) {
     status: alias.status || "active"
   };
 }
-
-// --- Route handlers ---
 
 async function handleGetAliasPool(_req, res) {
   const pool = await loadAliasPool();
