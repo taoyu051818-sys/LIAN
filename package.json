@@ -29,6 +29,7 @@
     "test": "node --test test/*.test.mjs",
     "test:object-native": "node scripts/test-object-native-runtime.js",
     "test:routes": "node scripts/test-routes.js",
+    "verify": "npm run check && npm run test:routes && npm run test:object-native && npm run verify:redis && npm run verify:redis:auth && npm run audit:feed-images",
     "verify:redis": "node scripts/verify-redis-object-primary.js",
     "verify:redis:auth": "node scripts/verify-redis-auth-object-indexes.js",
     "verify:redis:object-primary": "node scripts/verify-redis-object-primary.js",
