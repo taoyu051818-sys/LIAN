@@ -8,7 +8,7 @@ import { sendJson } from "./http-response.js";
 import { aiPostDraftsPath, aiPostRecordsPath } from "./paths.js";
 import { createNodebbTopicFromPayload } from "./post-service.js";
 import { readJsonBody } from "./request-utils.js";
-import { requireUser } from "./auth-service.js";
+import { requireUser, selectIdentityTag } from "./auth-service.js";
 import {
   AI_ALLOWED_CONTENT_TYPES,
   AI_ALLOWED_DISTRIBUTION,
@@ -32,6 +32,11 @@ function metadataArray(value, fallback = []) {
 
 function metadataVisibilityFromAudience(audience = {}) {
   return audience.linkOnly ? "linkOnly" : (audience.visibility || "public");
+}
+
+function normalizeSingleTag(payload = {}) {
+  const raw = payload.tag || payload.primaryTag || payload.metadata?.primaryTag || (Array.isArray(payload.tags) ? payload.tags[0] : "");
+  return normalizeHashtags([raw], 1)[0] || "";
 }
 
 function normalizeAiPublishMetadata(value = {}, locationDraft = {}, request = {}) {
@@ -68,11 +73,13 @@ function normalizeAiPublishMetadata(value = {}, locationDraft = {}, request = {}
     lat: hasLatLng ? Number(locationDraft.lat) : undefined,
     lng: hasLatLng ? Number(locationDraft.lng) : undefined,
     mapVersion: locationDraft?.mapVersion || (hasLatLng ? "gaode_v2" : "legacy"),
+    primaryTag: String(input.primaryTag || request.primaryTag || "").trim(),
+    identityTag: String(request.identityTag || "").trim(),
     locationDraft
   };
 }
 
-function normalizeAiPostPayload(payload = {}, { requireImage = false } = {}) {
+function normalizeAiPostPayload(payload = {}, { requireImage = false, user = null } = {}) {
   const imageUrls = Array.isArray(payload.imageUrls)
     ? payload.imageUrls.map((url) => normalizePostImageUrl(url, { width: 1200 })).filter(Boolean)
     : (payload.imageUrl ? [normalizePostImageUrl(payload.imageUrl, { width: 1200 })].filter(Boolean) : []);
@@ -97,13 +104,17 @@ function normalizeAiPostPayload(payload = {}, { requireImage = false } = {}) {
   const metadataInput = payload.metadata && typeof payload.metadata === "object" && !Array.isArray(payload.metadata)
     ? payload.metadata
     : {};
+  const primaryTag = normalizeSingleTag(payload);
+  const identityTag = selectIdentityTag(user || {}, payload.identityTag || metadataInput.identityTag || "");
   const locationDraft = normalizeLocationDraft(payload.locationDraft, {
     aiLocationArea: metadataInput.locationArea || "",
     locationHint: payload.locationHint || ""
   });
   const metadata = normalizeAiPublishMetadata(metadataInput, locationDraft, {
     template: metadataInput.contentType,
-    locationHint: payload.locationHint || ""
+    locationHint: payload.locationHint || "",
+    primaryTag,
+    identityTag
   });
   metadata.title = title;
   metadata.imageUrls = imageUrls;
@@ -112,7 +123,9 @@ function normalizeAiPostPayload(payload = {}, { requireImage = false } = {}) {
     imageUrls,
     title,
     body,
-    tags: normalizeHashtags(payload.tags, 5),
+    tag: primaryTag,
+    tags: primaryTag ? [primaryTag] : [],
+    identityTag,
     metadata,
     locationDraft,
     riskFlags: normalizeRiskFlags(payload.riskFlags),
@@ -134,7 +147,7 @@ function lianUserRecord(user = {}) {
 async function handleAiPostDraft(req, res) {
   const auth = await requireUser(req);
   const payload = await readJsonBody(req, AI_POST_PREVIEW_MAX_BODY_BYTES);
-  const normalized = normalizeAiPostPayload(payload);
+  const normalized = normalizeAiPostPayload(payload, { user: auth.user });
   const id = crypto.randomUUID();
   const record = {
     id,
@@ -145,7 +158,9 @@ async function handleAiPostDraft(req, res) {
     imageUrls: normalized.imageUrls,
     title: normalized.title,
     body: normalized.body,
+    tag: normalized.tag,
     tags: normalized.tags,
+    identityTag: normalized.identityTag,
     metadata: normalized.metadata,
     locationDraft: normalized.locationDraft,
     riskFlags: normalized.riskFlags,
@@ -164,7 +179,7 @@ async function handleAiPostPublish(req, res) {
   if (auth.user.status === "limited") return sendJson(res, 403, { error: "account is limited" });
 
   const payload = await readJsonBody(req, AI_POST_PREVIEW_MAX_BODY_BYTES);
-  const normalized = normalizeAiPostPayload(payload, { requireImage: true });
+  const normalized = normalizeAiPostPayload(payload, { requireImage: true, user: auth.user });
   normalized.metadata.audience = normalizeAudienceForCreate(auth.user, normalized.metadata.audience, normalized.metadata.visibility || "public");
   normalized.metadata.visibility = metadataVisibilityFromAudience(normalized.metadata.audience);
   if (!canCreatePostWithAudience(auth.user, normalized.metadata.audience)) {
@@ -181,7 +196,9 @@ async function handleAiPostPublish(req, res) {
     imageUrls: normalized.imageUrls,
     title: normalized.title,
     body: normalized.body,
+    tag: normalized.tag,
     tags: normalized.tags,
+    identityTag: normalized.identityTag,
     metadata: normalized.metadata,
     locationDraft: normalized.locationDraft,
     riskFlags: normalized.riskFlags,
@@ -199,8 +216,9 @@ async function handleAiPostPublish(req, res) {
       content: normalized.body,
       imageUrl: normalized.imageUrl,
       imageUrls: normalized.imageUrls,
-      tag: normalized.tags[0] || "",
+      tag: normalized.tag,
       tags: normalized.tags,
+      identityTag: normalized.identityTag,
       aliasId,
       placeName: normalized.locationDraft.displayName || normalized.locationDraft.locationArea || normalized.metadata.locationArea,
       mapLocation: normalized.locationDraft.skipped ? null : {
