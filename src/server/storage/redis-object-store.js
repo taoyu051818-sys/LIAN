@@ -118,6 +118,15 @@ async function writeObjectChannelReads(client, data = {}) {
   await replaceSet(client, "channel:read:users", users);
 }
 
+async function writeRedisObjectChannelReadItem(eventId, entry = {}) {
+  const client = await getRedisClient();
+  const key = String(eventId || "").trim();
+  if (!key) return false;
+  await setJson(client, `channel:read:user:${stableId(key)}`, { userId: key, ...(entry || {}) });
+  await client.sAdd(redisKey("channel:read:users"), key);
+  return true;
+}
+
 async function readObjectUserCache(client) {
   const userEntries = await readSetJson(client, "usercache:users", (userId) => `usercache:user:${stableId(userId)}`);
   const actorEntries = await readSetJson(client, "usercache:actors", (actorId) => `usercache:actor:${stableId(actorId)}`);
@@ -273,6 +282,7 @@ async function writeRedisObjectData(name, data = {}) {
 export {
   appendRedisObjectListItem,
   readRedisObjectData,
+  writeRedisObjectChannelReadItem,
   writeRedisObjectData,
   writeRedisObjectPostMetadataItem,
   writeRedisObjectUserCacheEntry
