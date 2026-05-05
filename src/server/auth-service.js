@@ -5,6 +5,8 @@ import { escapeHtml } from "./content-utils.js";
 import { loadAuthStore, saveAuthStore } from "./data-store.js";
 import { nodebbFetch } from "./nodebb-client.js";
 import { isProductionMode } from "./security-mode.js";
+import { isRedisStorageEnabled } from "./storage/redis-client.js";
+import { readRedisObjectAuthSession, readRedisObjectAuthUserById } from "./storage/redis-object-store.js";
 import { authInstitutions } from "./static-data.js";
 
 function allowedIdentityTags(user = {}) {
@@ -275,13 +277,46 @@ function sessionCookie(token, maxAge = 60 * 60 * 24 * 30) {
   return `lian_session=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; HttpOnly; SameSite=Lax${secure}`;
 }
 
-async function getCurrentUser(req, store = null) {
+function authObjectReadsEnabled() {
+  return isRedisStorageEnabled() && String(process.env.LIAN_AUTH_OBJECT_READS || "").toLowerCase() === "true";
+}
+
+async function getCurrentUserFromBulk(req, store = null) {
   const data = store || await loadAuthStore();
   const token = parseCookies(req).lian_session || req.headers["x-session-token"] || "";
   const session = token ? data.sessions[token] : null;
   if (!session || Date.now() > Date.parse(session.expiresAt || 0)) return { store: data, token: "", user: null };
   const user = data.users.find((item) => item.id === session.userId) || null;
   return { store: data, token, user };
+}
+
+async function getCurrentUserFromObjects(req) {
+  const token = parseCookies(req).lian_session || req.headers["x-session-token"] || "";
+  if (!token) return await getCurrentUserFromBulk(req);
+
+  const session = await readRedisObjectAuthSession(token);
+  if (!session || Date.now() > Date.parse(session.expiresAt || 0)) {
+    const data = await loadAuthStore();
+    return { store: data, token: "", user: null };
+  }
+
+  const objectUser = await readRedisObjectAuthUserById(session.userId);
+  if (!objectUser) return await getCurrentUserFromBulk(req);
+
+  const store = await loadAuthStore();
+  const storeUser = store.users.find((item) => item.id === session.userId) || null;
+  if (!storeUser) return { store, token, user: objectUser };
+  Object.assign(storeUser, objectUser);
+  return { store, token, user: storeUser };
+}
+
+async function getCurrentUser(req, store = null) {
+  if (store || !authObjectReadsEnabled()) return await getCurrentUserFromBulk(req, store);
+  try {
+    return await getCurrentUserFromObjects(req);
+  } catch {
+    return await getCurrentUserFromBulk(req, store);
+  }
 }
 
 async function requireUser(req) {
@@ -322,6 +357,7 @@ function applyInviteViolation(store, bannedUserId) {
 export {
   allowedIdentityTags,
   applyInviteViolation,
+  authObjectReadsEnabled,
   createEmailCode,
   createInviteCode,
   ensureNodebbUid,
