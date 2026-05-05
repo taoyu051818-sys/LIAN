@@ -18,7 +18,8 @@ import {
   appendRedisObjectListItem,
   readRedisObjectData,
   writeRedisObjectData,
-  writeRedisObjectPostMetadataItem
+  writeRedisObjectPostMetadataItem,
+  writeRedisObjectUserCacheEntry
 } from "./storage/redis-object-store.js";
 import { KEYS, appendJsonArrayKey, readJsonKey, writeJsonKey } from "./storage/redis-store.js";
 
@@ -227,6 +228,17 @@ async function saveUserCache(data) {
   memory.userCacheLoadedAt = Date.now();
 }
 
+async function saveUserCacheEntry(cache, userId, entry) {
+  if (redisStorageEnabled() && areRedisObjectReadsEnabled()) {
+    await writeRedisObjectUserCacheEntry(userId, entry);
+    await writeJsonKey(KEYS.userCache, cache);
+  } else {
+    await saveUserCache(cache);
+  }
+  memory.userCache = cache;
+  memory.userCacheLoadedAt = Date.now();
+}
+
 function ensureUserEntry(cache, userId) {
   if (!cache.users[userId]) {
     cache.users[userId] = { likedTids: [], savedTids: [], updatedAt: new Date().toISOString() };
@@ -244,7 +256,7 @@ async function recordUserLike(userId, tid, liked) {
     entry.likedTids = entry.likedTids.filter((t) => t !== tidNum);
   }
   entry.updatedAt = new Date().toISOString();
-  await saveUserCache(cache);
+  await saveUserCacheEntry(cache, userId, entry);
 }
 
 async function recordUserSave(userId, tid, saved) {
@@ -257,7 +269,7 @@ async function recordUserSave(userId, tid, saved) {
     entry.savedTids = entry.savedTids.filter((t) => t !== tidNum);
   }
   entry.updatedAt = new Date().toISOString();
-  await saveUserCache(cache);
+  await saveUserCacheEntry(cache, userId, entry);
 }
 
 async function recordActorMeta(nodebbUid, meta) {
