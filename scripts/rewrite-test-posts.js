@@ -15,7 +15,7 @@ function loadEnv() {
       const m = line.match(/^([^#=]+)=(.*)$/);
       if (m) {
         const key = m[1].trim();
-        let val = m[2].trim().replace(/^["']|["']$/g, "");
+        const val = m[2].trim().replace(/^["']|["']$/g, "");
         if (!process.env[key]) process.env[key] = val;
       }
     }
@@ -23,9 +23,14 @@ function loadEnv() {
 }
 loadEnv();
 
-const BASE = (process.env.NODEBB_BASE_URL || "http://149.104.21.74:4567").replace(/\/$/, "");
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const BASE = (process.env.NODEBB_BASE_URL || "http://149.104.21.74:4567").replace(/\/+$/, "");
 const TOKEN = process.env.NODEBB_API_TOKEN || "";
-const UID = process.env.NODEBB_UID || "2";
+const UID = String(parsePositiveInteger(process.env.NODEBB_UID, 2));
 const REMOVE_TAGS = ["推荐测试", "系统测试"];
 
 async function bbFetch(apiPath, options = {}) {
