@@ -216,7 +216,7 @@ async function writeBackendValidationScript(manifest) {
   const validatorPath = path.join(targetDir, "scripts", "validate-backend-structure.js");
   const content = `import fs from "node:fs/promises";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -264,7 +264,7 @@ async function checkJsonValid(file) {
 function checkSyntax(file) {
   const fullPath = path.join(rootDir, file);
   try {
-    execSync(\`node --check "\${fullPath}"\`, { stdio: "pipe" });
+    execFileSync(process.execPath, ["--check", fullPath], { stdio: "pipe" });
     ok(\`\${file} (语法正确)\`);
   } catch {
     fail(\`\${file} (语法检查)\`, "node --check 失败");
