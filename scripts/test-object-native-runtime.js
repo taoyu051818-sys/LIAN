@@ -1,20 +1,30 @@
 import assert from "node:assert/strict";
 
-import {
+process.env.LIAN_STORAGE_MODE ||= "db";
+process.env.LIAN_REDIS_OBJECT_READS ||= "true";
+process.env.LIAN_REDIS_OBJECT_PRIMARY ||= "true";
+process.env.LIAN_AUTH_OBJECT_READS ||= "true";
+process.env.LIAN_AUTH_OBJECT_NATIVE ||= "true";
+process.env.LIAN_REDIS_KEY_PREFIX ||= "lian:";
+
+const {
   getCurrentUser,
   hashPassword
-} from "../src/server/auth-service.js";
-import {
+} = await import("../src/server/auth-service.js");
+
+const {
   appendJsonLine,
   loadMetadata,
   loadUserCache,
   patchPostMetadata,
   recordUserLike,
   recordUserSave
-} from "../src/server/data-store.js";
-import { closeRedisClient } from "../src/server/storage/redis-client.js";
-import { KEYS } from "../src/server/storage/redis-store.js";
-import {
+} = await import("../src/server/data-store.js");
+
+const { closeRedisClient } = await import("../src/server/storage/redis-client.js");
+const { KEYS } = await import("../src/server/storage/redis-store.js");
+
+const {
   deleteRedisObjectAuthSession,
   readRedisObjectAuthInvite,
   readRedisObjectAuthSession,
@@ -27,20 +37,9 @@ import {
   writeRedisObjectAuthUser,
   writeRedisObjectAuthVerification,
   writeRedisObjectChannelReadItem
-} from "../src/server/storage/redis-object-store.js";
-
-function requireSwitch(name) {
-  if (String(process.env[name] || "").toLowerCase() !== "true") {
-    throw new Error(`${name}=true is required`);
-  }
-}
+} = await import("../src/server/storage/redis-object-store.js");
 
 async function main() {
-  requireSwitch("LIAN_REDIS_OBJECT_READS");
-  requireSwitch("LIAN_REDIS_OBJECT_PRIMARY");
-  requireSwitch("LIAN_AUTH_OBJECT_READS");
-  requireSwitch("LIAN_AUTH_OBJECT_NATIVE");
-
   const suffix = Date.now();
   const userId = `object-native-user-${suffix}`;
   const username = `object_native_${suffix}`;
@@ -74,8 +73,30 @@ async function main() {
   assert.equal((await readRedisObjectAuthUserByLogin(email)).id, userId);
   assert.equal((await readRedisObjectAuthSession(token)).userId, userId);
 
-  const auth = await getCurrentUser({ headers: { cookie: `lian_session=${encodeURIComponent(token)}` } });
-  assert.equal(auth.user.id, userId);
+  const auth = await getCurrentUser({
+    headers: {
+      cookie: `lian_session=${encodeURIComponent(token)}`
+    }
+  });
+
+  if (!auth.user) {
+    console.log(JSON.stringify({
+      debug: "getCurrentUser returned null",
+      token,
+      directSession: await readRedisObjectAuthSession(token),
+      directUser: await readRedisObjectAuthUserById(userId),
+      env: {
+        LIAN_STORAGE_MODE: process.env.LIAN_STORAGE_MODE,
+        LIAN_REDIS_OBJECT_READS: process.env.LIAN_REDIS_OBJECT_READS,
+        LIAN_REDIS_OBJECT_PRIMARY: process.env.LIAN_REDIS_OBJECT_PRIMARY,
+        LIAN_AUTH_OBJECT_READS: process.env.LIAN_AUTH_OBJECT_READS,
+        LIAN_AUTH_OBJECT_NATIVE: process.env.LIAN_AUTH_OBJECT_NATIVE,
+        LIAN_REDIS_KEY_PREFIX: process.env.LIAN_REDIS_KEY_PREFIX
+      }
+    }, null, 2));
+  }
+
+  assert.equal(auth.user?.id, userId);
   assert.equal(auth.token, token);
 
   await writeRedisObjectAuthInvite(inviteCode, {
@@ -118,7 +139,11 @@ async function main() {
   await appendJsonLine("/opt/lian-platform-server/data/ai-post-records.jsonl", { id: `record-${suffix}`, ok: true });
 
   await deleteRedisObjectAuthSession(token);
-  const loggedOut = await getCurrentUser({ headers: { cookie: `lian_session=${encodeURIComponent(token)}` } });
+  const loggedOut = await getCurrentUser({
+    headers: {
+      cookie: `lian_session=${encodeURIComponent(token)}`
+    }
+  });
   assert.equal(loggedOut.user, null);
 
   console.log(JSON.stringify({

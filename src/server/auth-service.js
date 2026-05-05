@@ -282,7 +282,10 @@ function sessionCookie(token, maxAge = 60 * 60 * 24 * 30) {
 }
 
 function authObjectReadsEnabled() {
-  return isRedisStorageEnabled() && String(process.env.LIAN_AUTH_OBJECT_READS || "").toLowerCase() === "true";
+  return isRedisStorageEnabled() && (
+    String(process.env.LIAN_AUTH_OBJECT_READS || "").toLowerCase() === "true" ||
+    String(process.env.LIAN_AUTH_OBJECT_NATIVE || "").toLowerCase() === "true"
+  );
 }
 
 function authObjectNativeEnabled() {
