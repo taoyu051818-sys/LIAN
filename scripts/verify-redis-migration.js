@@ -16,6 +16,8 @@ import {
 import { closeRedisClient, redisConfig } from "../src/server/storage/redis-client.js";
 import { KEYS, readJsonKey, readJsonListKey } from "../src/server/storage/redis-store.js";
 
+const allowGrowth = process.argv.includes("--allow-growth");
+
 async function readJsonFile(filePath, fallback) {
   try {
     return JSON.parse(await fs.readFile(filePath, "utf8"));
@@ -41,26 +43,35 @@ function countData(data) {
   return 0;
 }
 
+function countsOk(fileCount, redisCount) {
+  return allowGrowth ? redisCount >= fileCount : redisCount === fileCount;
+}
+
+function statusLabel(ok, fileCount, redisCount) {
+  if (ok && allowGrowth && redisCount > fileCount) return "growth";
+  return ok ? "ok" : "fail";
+}
+
 async function verifyJsonFile(label, filePath, key, fallback) {
   const fileData = await readJsonFile(filePath, fallback);
   const redisData = await readJsonKey(key, null);
   const fileCount = countData(fileData);
   const redisCount = countData(redisData);
-  const ok = redisData !== null && fileCount === redisCount;
-  console.log(`${ok ? "[ok]" : "[fail]"} ${label}: file=${fileCount} redis=${redisCount}`);
+  const ok = redisData !== null && countsOk(fileCount, redisCount);
+  console.log(`[${statusLabel(ok, fileCount, redisCount)}] ${label}: file=${fileCount} redis=${redisCount}`);
   return ok;
 }
 
 async function verifyJsonLines(label, filePath, key) {
   const fileCount = await countJsonLines(filePath);
   const redisCount = (await readJsonListKey(key)).length;
-  const ok = fileCount === redisCount;
-  console.log(`${ok ? "[ok]" : "[fail]"} ${label}: file=${fileCount} redis=${redisCount}`);
+  const ok = countsOk(fileCount, redisCount);
+  console.log(`[${statusLabel(ok, fileCount, redisCount)}] ${label}: file=${fileCount} redis=${redisCount}`);
   return ok;
 }
 
 async function main() {
-  console.log(`[verify] redis ${redisConfig.host}:${redisConfig.port} db=${redisConfig.database} prefix=${redisConfig.keyPrefix}`);
+  console.log(`[verify] redis ${redisConfig.host}:${redisConfig.port} db=${redisConfig.database} prefix=${redisConfig.keyPrefix} mode=${allowGrowth ? "allow-growth" : "strict"}`);
   const results = [];
   results.push(await verifyJsonFile("feed rules", rulesPath, KEYS.rules, {}));
   results.push(await verifyJsonFile("post metadata", metadataPath, KEYS.metadata, { items: {} }));
@@ -74,7 +85,7 @@ async function main() {
   results.push(await verifyJsonLines("AI drafts", aiPostDraftsPath, KEYS.aiDrafts));
   results.push(await verifyJsonLines("AI records", aiPostRecordsPath, KEYS.aiRecords));
   if (results.every(Boolean)) {
-    console.log("[verify] migration verified");
+    console.log(`[verify] migration verified${allowGrowth ? " with production growth allowed" : ""}`);
     return;
   }
   throw new Error("Redis migration verification failed");
