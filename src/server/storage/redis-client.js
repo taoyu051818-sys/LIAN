@@ -1,5 +1,7 @@
 import { createClient } from "redis";
 
+import { parseNonNegativeInteger, parsePositiveInteger } from "../config-schema.js";
+
 function clean(value = "") {
   return String(value || "").trim();
 }
@@ -11,9 +13,9 @@ function envFlag(value = "") {
 const redisConfig = {
   driver: clean(process.env.LIAN_DB_DRIVER || ""),
   host: clean(process.env.LIAN_REDIS_HOST || "127.0.0.1"),
-  port: Number(process.env.LIAN_REDIS_PORT || 6379),
+  port: parsePositiveInteger(process.env.LIAN_REDIS_PORT, 6379),
   password: process.env.LIAN_REDIS_PASSWORD || "",
-  database: Number(process.env.LIAN_REDIS_DB || 2),
+  database: parseNonNegativeInteger(process.env.LIAN_REDIS_DB, 2),
   keyPrefix: clean(process.env.LIAN_REDIS_KEY_PREFIX || "lian:"),
   storageMode: clean(process.env.LIAN_STORAGE_MODE || "file").toLowerCase(),
   allowFileFallback: envFlag(process.env.LIAN_STORAGE_MIGRATION_ALLOW_FILE_FALLBACK || "false"),
