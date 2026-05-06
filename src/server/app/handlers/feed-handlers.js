@@ -121,6 +121,7 @@ function toPostDetailDto(item = {}) {
     contentHtml: String(item.contentHtml || ""),
     cover: String(item.cover || ""),
     imageUrls,
+    primaryTag: String(item.primaryTag || ""),
     author: author.displayName,
     authorAvatarUrl: author.avatarUrl,
     authorIdentityTag: author.identityTag,
