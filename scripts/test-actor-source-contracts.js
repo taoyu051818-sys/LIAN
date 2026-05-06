@@ -8,7 +8,7 @@ import {
   normalizeSourceProvider
 } from "../src/server/post-actor-dto-service.js";
 import { normalizeChannelEvent } from "../src/server/app/handlers/channel-handlers.js";
-import { normalizeTabs, toPostDetailDto } from "../src/server/app/handlers/feed-handlers.js";
+import { normalizeTabs, toFeedItemDto, toPostDetailDto } from "../src/server/app/handlers/feed-handlers.js";
 
 let passed = 0;
 let failed = 0;
@@ -90,6 +90,39 @@ test("channel event exposes canonical actor/source and compatibility fields deri
   assert.equal(event.identityTag, event.actor.identityTag);
   assert.equal(event.authorAvatarText, event.actor.avatarText);
   assert.equal(event.avatarText, event.actor.avatarText);
+});
+
+console.log("");
+console.log("▶ feed item dto contract");
+test("feed item exposes canonical actor/source and legacy author object derived from actor", () => {
+  const item = toFeedItemDto({
+    tid: 250,
+    title: "Feed 合同",
+    bodyPreview: "hello",
+    author: {
+      nodebbUid: 42,
+      displayName: "官方账号",
+      avatarUrl: "https://example.com/avatar.png",
+      avatarText: "官",
+      identityTag: "provider"
+    },
+    metadata: {
+      sourceProvider: "official",
+      sourceLabel: "官方导入",
+      sourceVisible: true
+    }
+  });
+
+  assert.equal(item.actor.displayName, "官方账号");
+  assert.equal(item.actor.identityTag, "");
+  assert.deepEqual(item.source, { provider: "official", label: "官方导入", visible: true });
+  assert.deepEqual(item.author, {
+    nodebbUid: 42,
+    displayName: item.actor.displayName,
+    avatarUrl: item.actor.avatarUrl,
+    identityTag: item.actor.identityTag,
+    source: item.source.provider
+  });
 });
 
 console.log("");
