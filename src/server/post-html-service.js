@@ -7,23 +7,26 @@ import {
   proxiedPostImageUrl
 } from "./content-utils.js";
 
-function userSignature(user, alias = null) {
+function userSignature(user, alias = null, identityTag = "") {
   if (!user) return "";
   const displayName = alias?.name || user.username || "同学";
-  const tags = Array.isArray(user.tags) && user.tags.length ? `｜${user.tags.join(" ")}` : "";
-  return `\n\n<p style="color:#69706b;font-size:13px">来自 ${escapeHtml(displayName)}${escapeHtml(tags)}</p>`;
+  const signal = identityTag
+    ? `｜${identityTag}`
+    : (Array.isArray(user.tags) && user.tags.length ? `｜${user.tags.join(" ")}` : "");
+  return `\n\n<p style="color:#69706b;font-size:13px">来自 ${escapeHtml(displayName)}${escapeHtml(signal)}</p>`;
 }
 
 function buildLianUserMeta(user = {}, identityTag = "", alias = null) {
   if (!user?.id) return "";
   const displayName = alias?.name || user.username || "";
+  const selectedIdentityTag = selectIdentityTag(user, identityTag);
   const meta = {
     userId: user.id,
     nodebbUid: user.nodebbUid || null,
     username: displayName,
     aliasId: alias?.id || "",
     aliasName: alias?.name || "",
-    identityTag: identityTag || selectIdentityTag(user),
+    identityTag: selectedIdentityTag,
     avatarText: String(displayName || "同").slice(0, 1),
     avatarUrl: alias ? (alias.avatarUrl || "") : (user.avatarUrl || user.nodebbPicture || ""),
     sentAt: new Date().toISOString()
@@ -31,9 +34,30 @@ function buildLianUserMeta(user = {}, identityTag = "", alias = null) {
   return `<!-- lian-user-meta ${escapeHtml(JSON.stringify(meta))} -->`;
 }
 
+function normalizeDisplayTag(value = "") {
+  const tag = String(value || "").trim();
+  if (!tag) return "";
+  return tag.startsWith("#") ? tag : `#${tag}`;
+}
+
+function buildChannelMessageHtml(content, user, identityTag = "") {
+  const selectedIdentityTag = selectIdentityTag(user, identityTag);
+  const meta = {
+    userId: user.id,
+    nodebbUid: user.nodebbUid || null,
+    username: user.username,
+    identityTag: selectedIdentityTag,
+    avatarText: String(user.username || "同").slice(0, 1),
+    avatarUrl: user.avatarUrl || "",
+    sentAt: new Date().toISOString()
+  };
+  return `<!-- lian-channel-meta ${escapeHtml(JSON.stringify(meta))} -->\n${buildTextPostHtml(content)}`;
+}
+
 function buildTopicHtml(payload) {
   const blocks = [];
-  if (payload.currentUser) blocks.push(buildLianUserMeta(payload.currentUser, "", payload.alias || null));
+  const identityTag = selectIdentityTag(payload.currentUser || {}, payload.identityTag || "");
+  if (payload.currentUser) blocks.push(buildLianUserMeta(payload.currentUser, identityTag, payload.alias || null));
   const imageUrls = Array.isArray(payload.imageUrls) && payload.imageUrls.length
     ? payload.imageUrls
     : [payload.imageUrl].filter(Boolean);
@@ -41,7 +65,8 @@ function buildTopicHtml(payload) {
     const imageUrl = normalizePostImageUrl(rawImageUrl, { width: 1200 });
     blocks.push(`<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(payload.title || "cover")}" style="max-width:100%;height:auto" />`);
   }
-  if (payload.tag) blocks.push(`<p><strong>#${escapeHtml(payload.tag)}</strong></p>`);
+  const tag = normalizeDisplayTag(payload.tag);
+  if (tag) blocks.push(`<p><strong>${escapeHtml(tag)}</strong></p>`);
   const content = String(payload.content || "")
     .split(/\n{2,}/)
     .map((part) => part.trim())
@@ -55,7 +80,7 @@ function buildTopicHtml(payload) {
   if (payload.mapLocation && typeof payload.mapLocation === "object") {
     blocks.push(`<!-- lian-map-location ${escapeHtml(JSON.stringify(payload.mapLocation))} -->`);
   }
-  return `${blocks.join("\n\n").trim()}${userSignature(payload.currentUser, payload.alias || null)}`.trim();
+  return `${blocks.join("\n\n").trim()}${userSignature(payload.currentUser, payload.alias || null, identityTag)}`.trim();
 }
 
 function normalizeProfileTopic(topic, metadata = {}) {
@@ -85,6 +110,7 @@ function buildReplyHtml(content, user = null) {
 }
 
 export {
+  buildChannelMessageHtml,
   buildLianUserMeta,
   buildReplyHtml,
   buildTopicHtml,
