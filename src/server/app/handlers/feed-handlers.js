@@ -10,6 +10,7 @@ import {
   proxiedPostImageUrl
 } from "../../content-utils.js";
 import { authorFromTopic, fallbackAuthor, normalizeNodebbUid, resolveAuthorsByNodebbUids } from "../../author-service.js";
+import { buildActorSourcePair } from "../../post-actor-dto-service.js";
 import { makePostRepository } from "../adapters/post-repository-adapter.js";
 import { makeNodebbGateways } from "../gateways/nodebb/index.js";
 import { makeAudiencePolicy } from "../policies/audience-policy.js";
@@ -77,21 +78,28 @@ function normalizeTopicForDomain(topic = {}, metadata = {}) {
   };
 }
 
+function toLegacyAuthorDto(author = {}, actor = {}, source) {
+  return {
+    nodebbUid: normalizeNodebbUid(author.nodebbUid),
+    displayName: actor.displayName,
+    avatarUrl: actor.avatarUrl,
+    identityTag: actor.identityTag,
+    source: source?.provider || ""
+  };
+}
+
 function toFeedItemDto(item = {}) {
   const author = item.author || fallbackAuthor();
+  const { actor, source } = buildActorSourcePair(author, item.metadata || {});
   return {
     tid: Number(item.tid),
     title: String(item.title || "未命名"),
     bodyPreview: String(item.bodyPreview || ""),
     cover: String(item.cover || ""),
     primaryTag: String(item.primaryTag || ""),
-    author: {
-      nodebbUid: normalizeNodebbUid(author.nodebbUid),
-      displayName: String(author.displayName || "同学"),
-      avatarUrl: String(author.avatarUrl || ""),
-      identityTag: String(author.identityTag || ""),
-      source: String(author.source || "fallback")
-    },
+    actor,
+    source,
+    author: toLegacyAuthorDto(author, actor, source),
     timeLabel: String(item.timeLabel || ""),
     timestampISO: String(item.timestampISO || ""),
     likeCount: Math.max(0, Number(item.likeCount || 0) || 0),
@@ -103,11 +111,15 @@ function toFeedItemDto(item = {}) {
 
 function toReplyDto(post = {}) {
   const author = authorFromTopic({}, post);
+  const { actor, source } = buildActorSourcePair(author);
   return {
     id: Number(post.pid || post.index || 0) || 0,
     content: String(post.content || ""),
-    author: author.displayName,
-    authorAvatarUrl: author.avatarUrl,
+    actor,
+    source,
+    author: actor.displayName,
+    authorAvatarUrl: actor.avatarUrl,
+    authorIdentityTag: actor.identityTag,
     timestampISO: String(post.timestampISO || "")
   };
 }
@@ -116,6 +128,7 @@ function toPostDetailDto(item = {}) {
   const posts = Array.isArray(item.topic?.posts) ? item.topic.posts : [];
   const imageUrls = Array.isArray(item.imageUrls) ? item.imageUrls : [];
   const author = item.author || fallbackAuthor();
+  const { actor, source } = buildActorSourcePair(author, item.metadata || {});
   return {
     tid: Number(item.tid),
     title: String(item.title || "未命名"),
@@ -123,9 +136,11 @@ function toPostDetailDto(item = {}) {
     cover: String(item.cover || ""),
     imageUrls,
     primaryTag: String(item.primaryTag || ""),
-    author: author.displayName,
-    authorAvatarUrl: author.avatarUrl,
-    authorIdentityTag: author.identityTag,
+    actor,
+    source,
+    author: actor.displayName,
+    authorAvatarUrl: actor.avatarUrl,
+    authorIdentityTag: actor.identityTag,
     timestampISO: String(item.timestampISO || ""),
     timeLabel: String(item.timeLabel || ""),
     likeCount: Math.max(0, Number(item.likeCount || 0) || 0),
