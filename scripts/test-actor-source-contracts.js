@@ -8,7 +8,7 @@ import {
   normalizeSourceProvider
 } from "../src/server/post-actor-dto-service.js";
 import { normalizeChannelEvent } from "../src/server/app/handlers/channel-handlers.js";
-import { normalizeTabs } from "../src/server/app/handlers/feed-handlers.js";
+import { normalizeTabs, toPostDetailDto } from "../src/server/app/handlers/feed-handlers.js";
 
 let passed = 0;
 let failed = 0;
@@ -90,6 +90,67 @@ test("channel event exposes canonical actor/source and compatibility fields deri
   assert.equal(event.identityTag, event.actor.identityTag);
   assert.equal(event.authorAvatarText, event.actor.avatarText);
   assert.equal(event.avatarText, event.actor.avatarText);
+});
+
+console.log("");
+console.log("▶ post detail dto contract");
+test("post detail exposes canonical actor/source and legacy author fields derived from actor", () => {
+  const detail = toPostDetailDto({
+    tid: 300,
+    title: "官方来源帖",
+    contentHtml: "hello",
+    author: {
+      displayName: "官方账号",
+      avatarUrl: "https://example.com/avatar.png",
+      avatarText: "官",
+      identityTag: "provider"
+    },
+    metadata: {
+      sourceProvider: "official",
+      sourceLabel: "官方导入",
+      sourceVisible: true
+    },
+    topic: { posts: [] }
+  });
+
+  assert.equal(detail.actor.displayName, "官方账号");
+  assert.equal(detail.actor.identityTag, "");
+  assert.deepEqual(detail.source, { provider: "official", label: "官方导入", visible: true });
+  assert.equal(detail.author, detail.actor.displayName);
+  assert.equal(detail.authorAvatarUrl, detail.actor.avatarUrl);
+  assert.equal(detail.authorIdentityTag, detail.actor.identityTag);
+});
+
+test("post detail replies expose compatibility fields derived from reply actor", () => {
+  const detail = toPostDetailDto({
+    tid: 301,
+    title: "回复合同",
+    contentHtml: "hello",
+    author: { displayName: "楼主", identityTag: "校友认证" },
+    topic: {
+      posts: [
+        { pid: 1, content: "main" },
+        {
+          pid: 2,
+          content: "reply",
+          timestampISO: "2026-05-06T00:00:01.000Z",
+          user: {
+            uid: 42,
+            displayname: "回复同学",
+            picture: "/assets/avatar.png"
+          }
+        }
+      ]
+    }
+  });
+
+  assert.equal(detail.replies.length, 1);
+  const reply = detail.replies[0];
+  assert.equal(reply.actor.displayName, "回复同学");
+  assert.equal(reply.source, undefined);
+  assert.equal(reply.author, reply.actor.displayName);
+  assert.equal(reply.authorAvatarUrl, reply.actor.avatarUrl);
+  assert.equal(reply.authorIdentityTag, reply.actor.identityTag);
 });
 
 console.log("");
