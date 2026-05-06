@@ -1,4 +1,7 @@
-import { selectIdentityTag } from "./auth-service.js";
+import {
+  buildDisplayActorMeta,
+  resolveDisplayActor
+} from "./display-actor-service.js";
 import {
   buildTextPostHtml,
   escapeHtml,
@@ -9,28 +12,16 @@ import {
 
 function userSignature(user, alias = null, identityTag = "") {
   if (!user) return "";
-  const displayName = alias?.name || user.username || "同学";
+  const actor = resolveDisplayActor(user, alias);
   const signal = identityTag
     ? `｜${identityTag}`
     : (Array.isArray(user.tags) && user.tags.length ? `｜${user.tags.join(" ")}` : "");
-  return `\n\n<p style="color:#69706b;font-size:13px">来自 ${escapeHtml(displayName)}${escapeHtml(signal)}</p>`;
+  return `\n\n<p style="color:#69706b;font-size:13px">来自 ${escapeHtml(actor.displayName)}${escapeHtml(signal)}</p>`;
 }
 
 function buildLianUserMeta(user = {}, identityTag = "", alias = null) {
   if (!user?.id) return "";
-  const displayName = alias?.name || user.username || "";
-  const selectedIdentityTag = selectIdentityTag(user, identityTag);
-  const meta = {
-    userId: user.id,
-    nodebbUid: user.nodebbUid || null,
-    username: displayName,
-    aliasId: alias?.id || "",
-    aliasName: alias?.name || "",
-    identityTag: selectedIdentityTag,
-    avatarText: String(displayName || "同").slice(0, 1),
-    avatarUrl: alias ? (alias.avatarUrl || "") : (user.avatarUrl || user.nodebbPicture || ""),
-    sentAt: new Date().toISOString()
-  };
+  const meta = buildDisplayActorMeta(user, { alias, identityTag });
   return `<!-- lian-user-meta ${escapeHtml(JSON.stringify(meta))} -->`;
 }
 
@@ -41,23 +32,19 @@ function normalizeDisplayTag(value = "") {
 }
 
 function buildChannelMessageHtml(content, user, identityTag = "") {
-  const selectedIdentityTag = selectIdentityTag(user, identityTag);
-  const meta = {
-    userId: user.id,
-    nodebbUid: user.nodebbUid || null,
-    username: user.username,
-    identityTag: selectedIdentityTag,
-    avatarText: String(user.username || "同").slice(0, 1),
-    avatarUrl: user.avatarUrl || "",
-    sentAt: new Date().toISOString()
-  };
+  const meta = buildDisplayActorMeta(user, { identityTag });
   return `<!-- lian-channel-meta ${escapeHtml(JSON.stringify(meta))} -->\n${buildTextPostHtml(content)}`;
 }
 
 function buildTopicHtml(payload) {
   const blocks = [];
-  const identityTag = selectIdentityTag(payload.currentUser || {}, payload.identityTag || "");
-  if (payload.currentUser) blocks.push(buildLianUserMeta(payload.currentUser, identityTag, payload.alias || null));
+  const meta = payload.currentUser
+    ? buildDisplayActorMeta(payload.currentUser, {
+      alias: payload.alias || null,
+      identityTag: payload.identityTag || ""
+    })
+    : { identityTag: "" };
+  if (payload.currentUser) blocks.push(`<!-- lian-user-meta ${escapeHtml(JSON.stringify(meta))} -->`);
   const imageUrls = Array.isArray(payload.imageUrls) && payload.imageUrls.length
     ? payload.imageUrls
     : [payload.imageUrl].filter(Boolean);
@@ -80,7 +67,7 @@ function buildTopicHtml(payload) {
   if (payload.mapLocation && typeof payload.mapLocation === "object") {
     blocks.push(`<!-- lian-map-location ${escapeHtml(JSON.stringify(payload.mapLocation))} -->`);
   }
-  return `${blocks.join("\n\n").trim()}${userSignature(payload.currentUser, payload.alias || null, identityTag)}`.trim();
+  return `${blocks.join("\n\n").trim()}${userSignature(payload.currentUser, payload.alias || null, meta.identityTag)}`.trim();
 }
 
 function normalizeProfileTopic(topic, metadata = {}) {
@@ -103,10 +90,10 @@ function normalizeProfileTopic(topic, metadata = {}) {
   };
 }
 
-function buildReplyHtml(content, user = null) {
+function buildReplyHtml(content, user = null, { alias = null, identityTag = "" } = {}) {
   return String(content || "").trim().startsWith("<!-- lian-channel-meta")
     ? String(content || "").trim()
-    : `${buildLianUserMeta(user)}\n${buildTextPostHtml(content)}${userSignature(user)}`.trim();
+    : `${buildLianUserMeta(user, identityTag, alias)}\n${buildTextPostHtml(content)}${userSignature(user, alias, identityTag)}`.trim();
 }
 
 export {
