@@ -5,7 +5,6 @@ import {
 } from "../../content-utils.js";
 import {
   loadMetadata,
-  patchPostMetadata,
   recordUserLike,
   recordUserSave,
   getUserLikedTids,
@@ -24,6 +23,7 @@ import { readJsonBody } from "../../request-utils.js";
 import { ensureNodebbUid, requireUser } from "../../auth-service.js";
 import { findUserAlias } from "../../alias-service.js";
 import { makeCacheAdapter } from "../adapters/cache-adapter.js";
+import { makePostRepository } from "../adapters/post-repository-adapter.js";
 import { makeNodebbGateways } from "../gateways/nodebb/index.js";
 import { makeAudiencePolicy } from "../policies/audience-policy.js";
 import { makeInteractionPolicy } from "../policies/interaction-policy.js";
@@ -77,22 +77,6 @@ function buildMapMetadataPatch(mapLocation = {}) {
 
 function metadataVisibilityFromAudience(audience = {}) {
   return audience.linkOnly ? "linkOnly" : (audience.visibility || "public");
-}
-
-function makePostRepository() {
-  return {
-    async getByTid(tid) {
-      const metadata = await loadMetadata();
-      return metadata[String(tid)] || {};
-    },
-    async listByTids(tids = []) {
-      const metadata = await loadMetadata();
-      return Object.fromEntries(tids.map((tid) => [String(tid), metadata[String(tid)] || {}]));
-    },
-    async patchByTid(tid, patch) {
-      return await patchPostMetadata(tid, patch);
-    }
-  };
 }
 
 function makeNodebbDeps() {
