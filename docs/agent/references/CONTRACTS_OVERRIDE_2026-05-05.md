@@ -12,7 +12,7 @@ The API contract remains useful as a split-era inventory and compatibility refer
 4. Current root `README.md` for backend runtime/verification entrypoints.
 5. `api-route-registry.js` and route-registry tests for backend route ownership.
 6. This override file.
-7. `docs/agent/contracts/api-contract.md` as historical/API inventory context.
+7. `docs/agent/contracts/api-contract.md` as historical/API inventory context only.
 
 ## Current backend runtime facts
 
@@ -23,11 +23,75 @@ The API contract remains useful as a split-era inventory and compatibility refer
 - Route changes must satisfy `api-route-registry.js` and route-registry tests.
 - Backend checks include structure, encoding, smell guard, context-doc guard, docs maintenance guard, generated docs check, and route registry tests.
 
+## Current DTO contract facts
+
+Merged backend PRs #65, #66, #68, #69, #70, and #71 supersede legacy split-era DTO shapes for actor/source/place surfaces.
+
+### Actor/source identity
+
+Current post/feed/channel identity contract is canonical-only:
+
+```text
+actor = display identity
+actor.identityTag = optional trust/contribution signal
+source = platform/import/provider metadata
+```
+
+Do not reintroduce migration-only author fallback fields into backend response DTOs.
+
+Removed response fields include, but are not limited to:
+
+```text
+author
+authorAvatarUrl
+authorIdentityTag
+username
+identityTag
+avatarText
+avatarUrl
+authorAvatarText
+authorAliasId
+authorAliasName
+authorActorSource
+```
+
+Affected DTO surfaces:
+
+- Feed item DTO uses `actor` and optional `source`; it no longer returns a legacy `author` object.
+- PostDetail DTO uses `actor` and optional `source`; it no longer returns flat `author*` fields.
+- Reply DTO uses `actor` and optional `source`; it no longer returns flat `author*` fields.
+- Channel event DTO uses `actor` and optional `source`; it no longer returns flat author/avatar/alias fields.
+
+Contract tests in `scripts/test-actor-source-contracts.js` assert these legacy fields are absent.
+
+### PlaceRef / PlaceSheet identity
+
+Current place identity contract is stable-id only:
+
+```text
+PlaceRef = stable place identity used to open PlaceSheet
+PlaceSheet = stable place surface
+locationArea/manual text = display fallback only
+source/provider/name/status = metadata or display hints only, never relation identity
+```
+
+Do not infer `PlaceRef` or PlaceSheet relations from `locationArea`, marker text, color, provider, source label, or display name.
+
+Current stable aliases for place relation identity:
+
+```text
+locationId
+placeId
+```
+
+Contract tests in `scripts/test-place-sheet-contract.js` and `scripts/test-place-ref-stable-id-contract.js` assert this behavior.
+
 ## Known stale contract readings
 
 | Contract reading | Current correction |
 |---|---|
-| `Status: Frozen — Phase 0 of repo split` and `source of truth for API surface`. | Treat as split-era inventory. Current code, route registry, and merged PRs are authoritative. |
+| `Status: Frozen - Phase 0 of repo split` and `source of truth for API surface`. | Treat as split-era inventory. Current code, route registry, merged PRs, and this override are authoritative. |
+| Feed/PostDetail/Reply/Channel response examples with flat `author`, `authorAvatarUrl`, `authorIdentityTag`, `username`, `avatarUrl`, `identityTag`, or alias fields. | Stale after #71. Current DTOs use canonical `actor` + optional `source`; legacy author/avatar/identity/alias fields are intentionally absent. |
 | Backend route references only to old services such as `api-router.js` and inline routes. | Current route ownership includes `api-route-registry.js` and route-registry tests. |
 | File-backed data assumptions in endpoint implementation notes. | Runtime data model is Redis object-native unless current env/code says otherwise. |
 | Port assumptions such as `PORT=4100` and image proxy `4101`. | Current backend root README is authoritative for backend startup/runtime ports; frontend ports are owned by `lian-mobile-web`. |
@@ -50,8 +114,9 @@ Do not use it alone to decide:
 - whether an endpoint is still deprecated;
 - whether an endpoint is still called by frontend;
 - which route module owns it now;
-- whether a response shape has drifted.
+- whether a response shape has drifted;
+- whether legacy author/avatar/identity/alias fields should be returned.
 
 ## Update rule
 
-If an API contract matters for new backend implementation, verify current `api-route-registry.js`, current handler code, current root README, and current frontend callers first. Then either update the contract explicitly or create a newer dated contract addendum.
+If an API contract matters for new backend implementation, verify current `api-route-registry.js`, current handler code, current root README, current contract tests, and current frontend callers first. Then either update the contract explicitly or create a newer dated contract addendum.
