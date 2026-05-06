@@ -19,6 +19,10 @@ import {
   buildTopicHtml,
   normalizeProfileTopic
 } from "../../post-html-service.js";
+import {
+  buildMapMetadataPatch,
+  metadataVisibilityFromAudience
+} from "../../post-metadata-service.js";
 import { readJsonBody } from "../../request-utils.js";
 import { ensureNodebbUid, requireUser } from "../../auth-service.js";
 import { findUserAlias } from "../../alias-service.js";
@@ -36,41 +40,6 @@ import { makeCreatePostUseCase } from "../usecases/posts/create-post.js";
 import { makeGetSavedPostsUseCase } from "../usecases/profile/get-saved-posts.js";
 import { makeGetLikedPostsUseCase } from "../usecases/profile/get-liked-posts.js";
 import { makeGetHistoryPostsUseCase } from "../usecases/profile/get-history-posts.js";
-
-function buildMapMetadataPatch(mapLocation = {}) {
-  if (!mapLocation || typeof mapLocation !== "object") return {};
-  const lat = Number(mapLocation.lat);
-  const lng = Number(mapLocation.lng);
-  const hasLatLng = Number.isFinite(lat) && Number.isFinite(lng);
-  const x = Number(mapLocation.x);
-  const y = Number(mapLocation.y);
-  const hasLegacyPoint = Number.isFinite(x) && Number.isFinite(y);
-  if (!hasLatLng && !hasLegacyPoint && !mapLocation.placeName) return {};
-  return {
-    locationArea: String(mapLocation.placeName || "").trim(),
-    lat: hasLatLng ? lat : undefined,
-    lng: hasLatLng ? lng : undefined,
-    mapVersion: hasLatLng ? "gaode_v2" : "legacy",
-    locationDraft: {
-      source: hasLatLng ? "map_v2" : "legacy_map",
-      locationId: "",
-      locationArea: String(mapLocation.placeName || "").trim(),
-      displayName: String(mapLocation.placeName || "").trim(),
-      lat: hasLatLng ? lat : null,
-      lng: hasLatLng ? lng : null,
-      legacyPoint: { x: hasLegacyPoint ? x : null, y: hasLegacyPoint ? y : null },
-      imagePoint: { x: hasLegacyPoint ? x : null, y: hasLegacyPoint ? y : null },
-      mapVersion: hasLatLng ? "gaode_v2" : "legacy",
-      confidence: hasLatLng ? 0.72 : (hasLegacyPoint ? 0.65 : 0.4),
-      skipped: false,
-      note: ""
-    }
-  };
-}
-
-function metadataVisibilityFromAudience(audience = {}) {
-  return audience.linkOnly ? "linkOnly" : (audience.visibility || "public");
-}
 
 function makeCommonDeps() {
   return {
