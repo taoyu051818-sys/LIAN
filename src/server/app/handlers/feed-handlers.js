@@ -261,4 +261,9 @@ async function handlePostDetailRefactored(req, tid, res) {
   }
 }
 
-export { handleFeedDebugRefactored, handleFeedRefactored, handlePostDetailRefactored };
+export {
+  handleFeedDebugRefactored,
+  handleFeedRefactored,
+  handlePostDetailRefactored,
+  normalizeTabs
+};

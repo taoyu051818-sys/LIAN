@@ -12,7 +12,7 @@ This document is generated from executable project state so operational docs do 
 | --- | --- |
 | npm run audit:feed-images | node scripts/audit-feed-image-coverage.js |
 | npm run audit:feed-images:strict | node scripts/audit-feed-image-coverage.js --min-coverage=0.8 |
-| npm run check | node scripts/validate-backend-structure.js && node scripts/check-encoding-contamination.js && node scripts/check-code-smells.js && node scripts/check-context-docs.js && node scripts/check-docs-maintenance.js && npm run docs:check-generated && node scripts/test-route-registry.js |
+| npm run check | node scripts/validate-backend-structure.js && node scripts/check-encoding-contamination.js && node scripts/check-code-smells.js && node scripts/check-context-docs.js && node scripts/check-docs-maintenance.js && npm run docs:check-generated && node scripts/test-route-registry.js && node scripts/test-actor-source-contracts.js |
 | npm run check:backend | node scripts/validate-backend-structure.js |
 | npm run check:context | node scripts/check-context-docs.js |
 | npm run check:docs | node scripts/check-docs-maintenance.js |
@@ -22,6 +22,7 @@ This document is generated from executable project state so operational docs do 
 | npm run docs:generate | node scripts/generate-automation-docs.js |
 | npm run docs:list | node scripts/list-docs.js |
 | npm run test | node --test test/*.test.mjs |
+| npm run test:actor-source-contracts | node scripts/test-actor-source-contracts.js |
 | npm run test:nodebb-boundary | node scripts/test-nodebb-boundary.js |
 | npm run test:object-native | node scripts/test-object-native-runtime.js |
 | npm run test:ops-actions | node scripts/test-ops-actions.js |
