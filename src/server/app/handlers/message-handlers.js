@@ -1,18 +1,9 @@
 import { ensureNodebbUid, requireUser } from "../../auth-service.js";
-import { loadMetadata } from "../../data-store.js";
 import { sendJson } from "../../http-response.js";
+import { makePostRepository } from "../adapters/post-repository-adapter.js";
 import { makeNodebbGateways } from "../gateways/nodebb/index.js";
 import { makeAudiencePolicy } from "../policies/audience-policy.js";
 import { makeGetMessagesUseCase } from "../usecases/messages/get-messages.js";
-
-function makePostRepository() {
-  return {
-    async listByTids(tids = []) {
-      const metadata = await loadMetadata();
-      return Object.fromEntries(tids.map((tid) => [String(tid), metadata[String(tid)] || {}]));
-    }
-  };
-}
 
 function makeMessageCache() {
   return {
