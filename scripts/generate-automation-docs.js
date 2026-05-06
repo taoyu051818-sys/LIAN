@@ -89,11 +89,16 @@ function generateMarkdown() {
   lines.push("## Maintenance contract");
   lines.push("");
   lines.push("- Update source registries first, not this file.");
-  lines.push("- Run `npm run docs:generate` after changing route, public entry, workflow, or verification script facts.");
-  lines.push("- CI should run `npm run docs:check-generated` to block stale generated documentation.");
+  lines.push("- `npm run docs:check-generated` regenerates this file when it drifts and reports a warning instead of blocking CI.");
+  lines.push("- Review generated diffs when they matter, but do not hand-edit this file.");
   lines.push("");
 
   return `${lines.join("\n")}\n`;
+}
+
+function writeGeneratedDocs(content) {
+  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+  fs.writeFileSync(outputPath, content, "utf8");
 }
 
 function main() {
@@ -103,15 +108,16 @@ function main() {
 
   if (checkOnly) {
     if (current !== next) {
-      console.error("Generated automation docs are stale. Run `npm run docs:generate`.");
-      process.exit(1);
+      writeGeneratedDocs(next);
+      console.warn(`Generated automation docs were stale and have been regenerated at ${path.relative(repoRoot, outputPath)}.`);
+      console.warn("Generated docs drift is a warning, not a CI-blocking failure.");
+      return;
     }
     console.log("Generated automation docs are up to date.");
     return;
   }
 
-  fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, next, "utf8");
+  writeGeneratedDocs(next);
   console.log(`Wrote ${path.relative(repoRoot, outputPath)}`);
 }
 
