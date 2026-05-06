@@ -1,4 +1,4 @@
-const BLOCKED_IDENTITY_TAGS = new Set(["nodebb", "system", "lian", "imported"]);
+const BLOCKED_IDENTITY_TAGS = new Set(["nodebb", "system", "lian", "imported", "official", "source", "provider", "fallback"]);
 const ALLOWED_SOURCE_PROVIDERS = new Set(["nodebb", "lian", "imported", "official"]);
 
 function initialsFromName(value = "") {

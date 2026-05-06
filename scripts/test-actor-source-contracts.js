@@ -32,6 +32,10 @@ test("platform labels do not pass through identityTag", () => {
   assert.equal(normalizeIdentityTag("NodeBB"), "");
   assert.equal(normalizeIdentityTag("system"), "");
   assert.equal(normalizeIdentityTag("imported"), "");
+  assert.equal(normalizeIdentityTag("official"), "");
+  assert.equal(normalizeIdentityTag("source"), "");
+  assert.equal(normalizeIdentityTag("provider"), "");
+  assert.equal(normalizeIdentityTag("fallback"), "");
   assert.equal(normalizeIdentityTag("校友认证"), "校友认证");
 });
 
@@ -50,6 +54,17 @@ test("actor/source pair keeps identity and provider separate", () => {
   assert.equal(pair.actor.displayName, "小连");
   assert.equal(pair.actor.identityTag, "");
   assert.deepEqual(pair.source, { provider: "nodebb", label: "NodeBB", visible: false });
+});
+
+test("source labels stay in source and never become actor identity", () => {
+  const pair = buildActorSourcePair(
+    { displayName: "官方账号", identityTag: "official", avatarText: "官" },
+    { sourceProvider: "official", sourceLabel: "官方导入", sourceVisible: true }
+  );
+
+  assert.equal(pair.actor.displayName, "官方账号");
+  assert.equal(pair.actor.identityTag, "");
+  assert.deepEqual(pair.source, { provider: "official", label: "官方导入", visible: true });
 });
 
 console.log("");
