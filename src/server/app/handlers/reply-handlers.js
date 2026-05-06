@@ -1,35 +1,18 @@
-import {
-  buildTextPostHtml,
-  escapeHtml
-} from "../../content-utils.js";
 import { loadMetadata } from "../../data-store.js";
 import { sendJson } from "../../http-response.js";
+import { buildReplyHtml } from "../../post-html-service.js";
 import { readJsonBody } from "../../request-utils.js";
-import { ensureNodebbUid, requireUser, selectIdentityTag } from "../../auth-service.js";
+import { ensureNodebbUid, requireUser } from "../../auth-service.js";
 import { makeNodebbGateways } from "../gateways/nodebb/index.js";
 import { makeAudiencePolicy } from "../policies/audience-policy.js";
 import { makeInteractionPolicy } from "../policies/interaction-policy.js";
 import { makeCreateReplyUseCase } from "../usecases/posts/create-reply.js";
 
-function buildReplyUserMeta(user = {}) {
-  if (!user?.id) return "";
-  const meta = {
-    userId: user.id,
-    nodebbUid: user.nodebbUid || null,
-    username: user.username || "",
-    identityTag: selectIdentityTag(user),
-    avatarText: String(user.username || "同").slice(0, 1),
-    avatarUrl: user.avatarUrl || user.nodebbPicture || "",
-    sentAt: new Date().toISOString()
-  };
-  return `<!-- lian-user-meta ${escapeHtml(JSON.stringify(meta))} -->`;
-}
-
 function normalizeReplyContent(payload = {}, user = {}) {
   const raw = String(payload.content || payload.body || payload.message || "").trim();
   if (!raw) return "";
   if (raw.startsWith("<!-- lian-channel-meta") || raw.startsWith("<!-- lian-user-meta")) return raw;
-  return `${buildReplyUserMeta(user)}\n${buildTextPostHtml(raw)}`.trim();
+  return buildReplyHtml(raw, user, { identityTag: String(payload.identityTag || "").trim() });
 }
 
 function makePostRepository() {
@@ -77,7 +60,6 @@ async function handleCreateReplyRefactored(tid, req, res) {
 }
 
 export {
-  buildReplyUserMeta,
   handleCreateReplyRefactored,
   normalizeReplyContent
 };
