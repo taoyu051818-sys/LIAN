@@ -1,9 +1,9 @@
-import { loadMetadata } from "../../data-store.js";
 import { sendJson } from "../../http-response.js";
 import { buildReplyHtml } from "../../post-html-service.js";
 import { readJsonBody } from "../../request-utils.js";
 import { ensureNodebbUid, requireUser } from "../../auth-service.js";
 import { makeNodebbGateways } from "../gateways/nodebb/index.js";
+import { makePostRepository } from "../adapters/post-repository-adapter.js";
 import { makeAudiencePolicy } from "../policies/audience-policy.js";
 import { makeInteractionPolicy } from "../policies/interaction-policy.js";
 import { makeCreateReplyUseCase } from "../usecases/posts/create-reply.js";
@@ -13,15 +13,6 @@ function normalizeReplyContent(payload = {}, user = {}) {
   if (!raw) return "";
   if (raw.startsWith("<!-- lian-channel-meta") || raw.startsWith("<!-- lian-user-meta")) return raw;
   return buildReplyHtml(raw, user, { identityTag: String(payload.identityTag || "").trim() });
-}
-
-function makePostRepository() {
-  return {
-    async getByTid(tid) {
-      const metadata = await loadMetadata();
-      return metadata[String(tid)] || {};
-    }
-  };
 }
 
 function makeReplyCache() {
