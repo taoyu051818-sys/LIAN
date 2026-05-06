@@ -3,6 +3,12 @@
 import assert from "node:assert/strict";
 
 import {
+  buildMapMetadataPatch,
+  buildPublishLocationResult,
+  buildPublishResponseDto,
+  normalizePublishLocationInput
+} from "../src/server/post-metadata-service.js";
+import {
   buildPlaceRef,
   buildPlaceRefFromMetadata,
   buildPlaceSheetDto,
@@ -162,6 +168,135 @@ test("map post marker exposes place only when metadata has known place binding",
 });
 
 console.log("");
+console.log("▶ publish place contract");
+test("publish location input prefers modern location place identity over legacy mapLocation", () => {
+  const normalized = normalizePublishLocationInput(
+    {
+      placeId: "canteen",
+      placeName: "食堂",
+      lat: "18.3997424",
+      lng: "110.0244927"
+    },
+    {
+      locationId: "library",
+      placeName: "图书馆",
+      x: 12,
+      y: 34
+    }
+  );
+
+  assert.equal(normalized.placeId, "canteen");
+  assert.equal(normalized.placeName, "食堂");
+  assert.equal(normalized.lat, 18.3997424);
+  assert.equal(normalized.lng, 110.0244927);
+  assert.equal(normalized.x, 12);
+  assert.equal(normalized.y, 34);
+  assert.equal(normalized.hasLatLng, true);
+  assert.equal(normalized.hasLegacyPoint, true);
+});
+
+test("publish metadata patch persists modern known place binding and map coordinates", () => {
+  const patch = buildMapMetadataPatch(
+    {},
+    {
+      placeId: "canteen",
+      placeName: "食堂",
+      lat: 18.3997424,
+      lng: 110.0244927
+    }
+  );
+
+  assert.equal(patch.locationId, "canteen");
+  assert.equal(patch.locationArea, "食堂");
+  assert.equal(patch.lat, 18.3997424);
+  assert.equal(patch.lng, 110.0244927);
+  assert.equal(patch.mapVersion, "gaode_v2");
+  assert.deepEqual(patch.locationDraft, {
+    source: "map_v2",
+    locationId: "canteen",
+    locationArea: "食堂",
+    displayName: "食堂",
+    lat: 18.3997424,
+    lng: 110.0244927,
+    legacyPoint: { x: null, y: null },
+    imagePoint: { x: null, y: null },
+    mapVersion: "gaode_v2",
+    confidence: 0.9,
+    skipped: false,
+    note: ""
+  });
+});
+
+test("publish metadata patch keeps legacy map place binding compatible", () => {
+  const patch = buildMapMetadataPatch(
+    {
+      locationId: "canteen",
+      placeName: "食堂",
+      x: 12,
+      y: 34
+    },
+    {}
+  );
+
+  assert.equal(patch.locationId, "canteen");
+  assert.equal(patch.locationArea, "食堂");
+  assert.equal(patch.lat, undefined);
+  assert.equal(patch.lng, undefined);
+  assert.equal(patch.mapVersion, "legacy");
+  assert.deepEqual(patch.locationDraft.legacyPoint, { x: 12, y: 34 });
+  assert.deepEqual(patch.locationDraft.imagePoint, { x: 12, y: 34 });
+  assert.equal(patch.locationDraft.source, "place_binding");
+  assert.equal(patch.locationDraft.confidence, 0.9);
+});
+
+test("publish response returns PlaceRef only for known place ids", () => {
+  const response = buildPublishResponseDto(
+    { tid: 200, title: "发布成功" },
+    { locationId: "canteen", locationArea: "食堂" },
+    knownLocations
+  );
+
+  assert.equal(response.tid, 200);
+  assert.equal(response.title, "发布成功");
+  assert.equal(response.locationArea, "食堂");
+  assert.deepEqual(response.place, {
+    id: "canteen",
+    name: "食堂",
+    type: "merchant",
+    status: "confirmed",
+    lat: 18.3997424,
+    lng: 110.0244927
+  });
+});
+
+test("publish manual fallback keeps locationArea display-only and does not infer PlaceRef", () => {
+  const patch = buildMapMetadataPatch(
+    {},
+    { placeName: "食堂门口" }
+  );
+  const response = buildPublishResponseDto(
+    { tid: 201, title: "手填地点发布成功" },
+    patch,
+    knownLocations
+  );
+
+  assert.equal(patch.locationId, "");
+  assert.equal(patch.locationArea, "食堂门口");
+  assert.equal(patch.locationDraft.source, "legacy_map");
+  assert.equal(response.locationArea, "食堂门口");
+  assert.equal(Object.prototype.hasOwnProperty.call(response, "place"), false);
+});
+
+test("publish location result never parses locationArea or missing ids as place identity", () => {
+  assert.deepEqual(buildPublishLocationResult({ locationArea: "食堂" }, knownLocations), {
+    locationArea: "食堂"
+  });
+  assert.deepEqual(buildPublishLocationResult({ locationId: "missing", locationArea: "食堂" }, knownLocations), {
+    locationArea: "食堂"
+  });
+});
+
+console.log("");
 console.log("▶ place sheet dto contract");
 test("PlaceSheetDto exposes place, server-owned status/source, stats, summary, and preview posts", () => {
   const sheet = buildPlaceSheetDto(
@@ -235,7 +370,7 @@ console.log("");
 console.log("═══ Result ═══");
 console.log(`Passed: ${passed}, Failed: ${failed}`);
 if (failed > 0) {
-  console.log("\nPlaceSheet contract failed. Keep #59 route, PlaceRefDto, PlaceSheetDto, detail/map place, and legacy location fallback semantics stable.");
+  console.log("\nPlaceSheet contract failed. Keep #59 route, PlaceRefDto, PlaceSheetDto, detail/map/publish place, and legacy location fallback semantics stable.");
   process.exit(1);
 }
 
