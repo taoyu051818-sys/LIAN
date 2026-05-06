@@ -14,7 +14,7 @@
   "scripts": {
     "audit:feed-images": "node scripts/audit-feed-image-coverage.js",
     "audit:feed-images:strict": "node scripts/audit-feed-image-coverage.js --min-coverage=0.8",
-    "check": "node scripts/validate-backend-structure.js && node scripts/check-encoding-contamination.js && node scripts/check-code-smells.js && node scripts/check-context-docs.js && node scripts/check-docs-maintenance.js && npm run docs:check-generated && node scripts/test-route-registry.js && node scripts/test-actor-source-contracts.js && node scripts/test-place-sheet-contract.js",
+    "check": "node scripts/validate-backend-structure.js && node scripts/check-encoding-contamination.js && node scripts/check-code-smells.js && node scripts/check-context-docs.js && node scripts/check-docs-maintenance.js && npm run docs:check-generated && node scripts/test-route-registry.js && node scripts/test-actor-source-contracts.js && node scripts/test-place-sheet-contract.js && node scripts/test-place-ref-stable-id-contract.js",
     "check:backend": "node scripts/validate-backend-structure.js",
     "check:context": "node scripts/check-context-docs.js",
     "check:docs": "node scripts/check-docs-maintenance.js",
@@ -37,6 +37,7 @@
     "test:nodebb-boundary": "node scripts/test-nodebb-boundary.js",
     "test:object-native": "node scripts/test-object-native-runtime.js",
     "test:ops-actions": "node scripts/test-ops-actions.js",
+    "test:place-ref-stable-id-contract": "node scripts/test-place-ref-stable-id-contract.js",
     "test:place-sheet-contract": "node scripts/test-place-sheet-contract.js",
     "test:public-entry-checks": "node scripts/test-public-entry-checks.js",
     "test:route-manifest": "node scripts/test-route-manifest.js",
