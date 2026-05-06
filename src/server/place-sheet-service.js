@@ -58,9 +58,8 @@ function buildPlaceRefFromMetadata(metadata = {}, locations = []) {
 
 function metadataMatchesPlace(metadata = {}, place = {}) {
   if (!metadata || typeof metadata !== "object") return false;
-  if (metadata.locationId && metadata.locationId === place.id) return true;
-  if (metadata.placeId && metadata.placeId === place.id) return true;
-  return false;
+  const id = locationIdFromMetadata(metadata);
+  return Boolean(id && id === place.id);
 }
 
 function firstImageUrl(metadata = {}) {
