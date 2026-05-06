@@ -23,8 +23,8 @@ import { readJsonBody } from "../../request-utils.js";
 import { ensureNodebbUid, requireUser } from "../../auth-service.js";
 import { findUserAlias } from "../../alias-service.js";
 import { makeCacheAdapter } from "../adapters/cache-adapter.js";
+import { makeNodebbDeps } from "../adapters/nodebb-deps-adapter.js";
 import { makePostRepository } from "../adapters/post-repository-adapter.js";
-import { makeNodebbGateways } from "../gateways/nodebb/index.js";
 import { makeAudiencePolicy } from "../policies/audience-policy.js";
 import { makeInteractionPolicy } from "../policies/interaction-policy.js";
 import { makePublishPolicy } from "../policies/publish-policy.js";
@@ -36,13 +36,6 @@ import { makeCreatePostUseCase } from "../usecases/posts/create-post.js";
 import { makeGetSavedPostsUseCase } from "../usecases/profile/get-saved-posts.js";
 import { makeGetLikedPostsUseCase } from "../usecases/profile/get-liked-posts.js";
 import { makeGetHistoryPostsUseCase } from "../usecases/profile/get-history-posts.js";
-
-function jsonBearerHeaders() {
-  return {
-    "content-type": "application/json; charset=utf-8",
-    authorization: `Bearer ${config.nodebbToken}`
-  };
-}
 
 function buildMapMetadataPatch(mapLocation = {}) {
   if (!mapLocation || typeof mapLocation !== "object") return {};
@@ -77,42 +70,6 @@ function buildMapMetadataPatch(mapLocation = {}) {
 
 function metadataVisibilityFromAudience(audience = {}) {
   return audience.linkOnly ? "linkOnly" : (audience.visibility || "public");
-}
-
-function makeNodebbDeps() {
-  const base = makeNodebbGateways();
-  return {
-    topics: {
-      ...base.topics,
-      createTopic: (args) => base.topics.createTopic({ ...args, headers: jsonBearerHeaders() }),
-      createReply: (args) => base.topics.createReply({ ...args, headers: jsonBearerHeaders() }),
-      markRead: (args) => base.topics.markRead({ ...args, headers: jsonBearerHeaders() })
-    },
-    posts: {
-      ...base.posts,
-      votePost: (args) => base.posts.votePost({ ...args, headers: jsonBearerHeaders() }),
-      unvotePost: (args) => base.posts.unvotePost({ ...args, headers: jsonBearerHeaders() }),
-      bookmarkPost: async (args) => {
-        try { return await base.posts.bookmarkPost({ ...args, headers: jsonBearerHeaders() }); }
-        catch (error) {
-          const msg = String(error.message || "").toLowerCase();
-          if (msg.includes("already bookmarked") || msg.includes("already saved")) return {};
-          throw error;
-        }
-      },
-      unbookmarkPost: async (args) => {
-        try { return await base.posts.unbookmarkPost({ ...args, headers: jsonBearerHeaders() }); }
-        catch (error) {
-          const msg = String(error.message || "").toLowerCase();
-          if (msg.includes("not bookmarked") || msg.includes("not saved")) return {};
-          throw error;
-        }
-      },
-      flagPost: (args) => base.posts.flagPost({ ...args, headers: jsonBearerHeaders() })
-    },
-    users: base.users,
-    notifications: base.notifications
-  };
 }
 
 function makeCommonDeps() {
