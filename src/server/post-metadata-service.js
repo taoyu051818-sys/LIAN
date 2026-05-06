@@ -1,4 +1,5 @@
 import { normalizeAudience } from "./audience-service.js";
+import { buildPlaceRefFromMetadata } from "./place-sheet-service.js";
 
 const AI_ALLOWED_CONTENT_TYPES = new Set([
   "campus_moment",
@@ -117,6 +118,23 @@ function buildMapMetadataPatch(mapLocation = {}, locationInput = {}) {
   };
 }
 
+function buildPublishLocationResult(metadata = {}, locations = []) {
+  const place = buildPlaceRefFromMetadata(metadata, locations);
+  const locationArea = truncateMetadataText(metadata.locationArea || "", 80);
+  return {
+    ...(locationArea ? { locationArea } : {}),
+    ...(place ? { place } : {})
+  };
+}
+
+function buildPublishResponseDto(topic = {}, metadata = {}, locations = []) {
+  const base = topic && typeof topic === "object" && !Array.isArray(topic) ? topic : { topic };
+  return {
+    ...base,
+    ...buildPublishLocationResult(metadata, locations)
+  };
+}
+
 function normalizeAiPublishMetadata(value = {}, locationDraft = {}, request = {}) {
   const input = value && typeof value === "object" && !Array.isArray(value) ? value : {};
   const contentType = AI_ALLOWED_CONTENT_TYPES.has(input.contentType)
@@ -160,6 +178,8 @@ export {
   AI_ALLOWED_VISIBILITY,
   AI_DEFAULT_METADATA,
   buildMapMetadataPatch,
+  buildPublishLocationResult,
+  buildPublishResponseDto,
   metadataArray,
   metadataVisibilityFromAudience,
   normalizeAiPublishMetadata,
