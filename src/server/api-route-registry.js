@@ -26,6 +26,7 @@ import { handleMessages } from "./notification-service.js";
 import { nodebbFetch } from "./nodebb-client.js";
 import { handleOpsAction, handleOpsDeployWebhook, handleOpsHealth } from "./ops-service.js";
 import { handleOpsObservability } from "./ops-observability-route.js";
+import { handlePlaceSheet } from "./place-sheet-service.js";
 import {
   handleFeedDebugRefactored as handleFeedDebug,
   handleFeedRefactored as handleFeed,
@@ -143,6 +144,7 @@ const ROUTE_HANDLERS = {
   "me-saved": ({ req, res }) => handleGetSavedPosts(req, res),
   "me-liked": ({ req, res }) => handleGetLikedPosts(req, res),
   "me-history": ({ req, res }) => handleGetHistory(req, res),
+  "place-sheet": ({ route, req, res }) => handlePlaceSheet(req, route.params.placeId, res),
   "post-detail": ({ route, req, res }) => handlePostDetail(req, Number(route.params.tid), res),
   "post-replies": ({ route, req, res }) => handleCreateReply(Number(route.params.tid), req, res),
   "post-like": ({ route, req, res }) => handleTogglePostLike(Number(route.params.tid), req, res),
