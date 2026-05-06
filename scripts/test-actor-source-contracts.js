@@ -8,7 +8,7 @@ import {
   normalizeSourceProvider
 } from "../src/server/post-actor-dto-service.js";
 import { normalizeChannelEvent } from "../src/server/app/handlers/channel-handlers.js";
-import { normalizeTabs, toPostDetailDto } from "../src/server/app/handlers/feed-handlers.js";
+import { normalizeTabs, toFeedItemDto, toPostDetailDto } from "../src/server/app/handlers/feed-handlers.js";
 
 let passed = 0;
 let failed = 0;
@@ -22,6 +22,12 @@ function test(name, fn) {
     console.log(`  ✗ ${name}`);
     console.log(`    ${error.message}`);
     failed += 1;
+  }
+}
+
+function assertNoKeys(object, keys) {
+  for (const key of keys) {
+    assert.equal(Object.prototype.hasOwnProperty.call(object, key), false, `${key} should not be present`);
   }
 }
 
@@ -69,7 +75,7 @@ test("source labels stay in source and never become actor identity", () => {
 
 console.log("");
 console.log("▶ channel dto contract");
-test("channel event exposes canonical actor/source and compatibility fields derived from actor", () => {
+test("channel event exposes canonical actor/source and no legacy author fields", () => {
   const event = normalizeChannelEvent(
     { tid: 100, title: "校园频道", timestampISO: "2026-05-06T00:00:00.000Z" },
     {
@@ -84,17 +90,52 @@ test("channel event exposes canonical actor/source and compatibility fields deri
   assert.equal(event.actor.identityTag, "");
   assert.equal(event.source.provider, "nodebb");
   assert.equal(event.source.visible, false);
-  assert.equal(event.author, event.actor.displayName);
-  assert.equal(event.username, event.actor.displayName);
-  assert.equal(event.authorIdentityTag, event.actor.identityTag);
-  assert.equal(event.identityTag, event.actor.identityTag);
-  assert.equal(event.authorAvatarText, event.actor.avatarText);
-  assert.equal(event.avatarText, event.actor.avatarText);
+  assertNoKeys(event, [
+    "author",
+    "username",
+    "authorUserId",
+    "authorIdentityTag",
+    "identityTag",
+    "authorAvatarText",
+    "avatarText",
+    "authorAvatarUrl",
+    "avatarUrl",
+    "authorAliasId",
+    "authorAliasName",
+    "authorActorSource"
+  ]);
+});
+
+console.log("");
+console.log("▶ feed item dto contract");
+test("feed item exposes canonical actor/source and no legacy author object", () => {
+  const item = toFeedItemDto({
+    tid: 250,
+    title: "Feed 合同",
+    bodyPreview: "hello",
+    author: {
+      nodebbUid: 42,
+      displayName: "官方账号",
+      avatarUrl: "https://example.com/avatar.png",
+      avatarText: "官",
+      identityTag: "provider"
+    },
+    metadata: {
+      sourceProvider: "official",
+      sourceLabel: "官方导入",
+      sourceVisible: true
+    }
+  });
+
+  assert.equal(item.actor.displayName, "官方账号");
+  assert.equal(item.actor.identityTag, "");
+  assert.deepEqual(item.source, { provider: "official", label: "官方导入", visible: true });
+  assertNoKeys(item, ["author"]);
 });
 
 console.log("");
 console.log("▶ post detail dto contract");
-test("post detail exposes canonical actor/source and legacy author fields derived from actor", () => {
+test("post detail exposes canonical actor/source and no legacy author fields", () => {
   const detail = toPostDetailDto({
     tid: 300,
     title: "官方来源帖",
@@ -116,12 +157,10 @@ test("post detail exposes canonical actor/source and legacy author fields derive
   assert.equal(detail.actor.displayName, "官方账号");
   assert.equal(detail.actor.identityTag, "");
   assert.deepEqual(detail.source, { provider: "official", label: "官方导入", visible: true });
-  assert.equal(detail.author, detail.actor.displayName);
-  assert.equal(detail.authorAvatarUrl, detail.actor.avatarUrl);
-  assert.equal(detail.authorIdentityTag, detail.actor.identityTag);
+  assertNoKeys(detail, ["author", "authorAvatarUrl", "authorIdentityTag"]);
 });
 
-test("post detail replies expose compatibility fields derived from reply actor", () => {
+test("post detail replies expose canonical actor/source and no legacy author fields", () => {
   const detail = toPostDetailDto({
     tid: 301,
     title: "回复合同",
@@ -148,9 +187,7 @@ test("post detail replies expose compatibility fields derived from reply actor",
   const reply = detail.replies[0];
   assert.equal(reply.actor.displayName, "回复同学");
   assert.equal(reply.source, undefined);
-  assert.equal(reply.author, reply.actor.displayName);
-  assert.equal(reply.authorAvatarUrl, reply.actor.avatarUrl);
-  assert.equal(reply.authorIdentityTag, reply.actor.identityTag);
+  assertNoKeys(reply, ["author", "authorAvatarUrl", "authorIdentityTag"]);
 });
 
 console.log("");
@@ -183,7 +220,7 @@ console.log("");
 console.log("═══ Result ═══");
 console.log(`Passed: ${passed}, Failed: ${failed}`);
 if (failed > 0) {
-  console.log("\nActor/source DTO contract failed. Keep display actor, identityTag, and source semantics separate.");
+  console.log("\nActor/source DTO contract failed. Keep display actor, identityTag, and source semantics separate, with no legacy author fallback fields.");
   process.exit(1);
 }
 

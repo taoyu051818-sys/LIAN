@@ -80,16 +80,6 @@ function normalizeTopicForDomain(topic = {}, metadata = {}) {
   };
 }
 
-function toLegacyAuthorDto(author = {}, actor = {}, source) {
-  return {
-    nodebbUid: normalizeNodebbUid(author.nodebbUid),
-    displayName: actor.displayName,
-    avatarUrl: actor.avatarUrl,
-    identityTag: actor.identityTag,
-    source: source?.provider || ""
-  };
-}
-
 function toFeedItemDto(item = {}) {
   const author = item.author || fallbackAuthor();
   const { actor, source } = buildActorSourcePair(author, item.metadata || {});
@@ -101,7 +91,6 @@ function toFeedItemDto(item = {}) {
     primaryTag: String(item.primaryTag || ""),
     actor,
     source,
-    author: toLegacyAuthorDto(author, actor, source),
     timeLabel: String(item.timeLabel || ""),
     timestampISO: String(item.timestampISO || ""),
     likeCount: Math.max(0, Number(item.likeCount || 0) || 0),
@@ -119,9 +108,6 @@ function toReplyDto(post = {}) {
     content: String(post.content || ""),
     actor,
     source,
-    author: actor.displayName,
-    authorAvatarUrl: actor.avatarUrl,
-    authorIdentityTag: actor.identityTag,
     timestampISO: String(post.timestampISO || "")
   };
 }
@@ -142,9 +128,6 @@ function toPostDetailDto(item = {}, options = {}) {
     primaryTag: String(item.primaryTag || ""),
     actor,
     source,
-    author: actor.displayName,
-    authorAvatarUrl: actor.avatarUrl,
-    authorIdentityTag: actor.identityTag,
     timestampISO: String(item.timestampISO || ""),
     timeLabel: String(item.timeLabel || ""),
     likeCount: Math.max(0, Number(item.likeCount || 0) || 0),
@@ -272,5 +255,6 @@ export {
   handleFeedRefactored,
   handlePostDetailRefactored,
   normalizeTabs,
+  toFeedItemDto,
   toPostDetailDto
 };
