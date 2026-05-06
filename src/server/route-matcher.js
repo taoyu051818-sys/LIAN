@@ -51,6 +51,7 @@ const PREFIX_ROUTES = [
 ];
 
 const REGEX_ROUTES = [
+  { method: "GET", pattern: /^\/api\/place-sheets\/([A-Za-z0-9._~-]+)$/, id: "place-sheet", keys: ["placeId"] },
   { method: "GET", pattern: /^\/api\/posts\/(\d+)$/, id: "post-detail", keys: ["tid"] },
   { method: "POST", pattern: /^\/api\/posts\/(\d+)\/replies$/, id: "post-replies", keys: ["tid"] },
   { method: "POST", pattern: /^\/api\/posts\/(\d+)\/like$/, id: "post-like", keys: ["tid"] },
