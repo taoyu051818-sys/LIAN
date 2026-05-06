@@ -1,5 +1,5 @@
 import { getCurrentUser, ensureNodebbUid } from "../../auth-service.js";
-import { loadMetadata, loadRules } from "../../data-store.js";
+import { loadRules } from "../../data-store.js";
 import { scoreItemForInterests } from "../../interest-service.js";
 import { sendJson } from "../../http-response.js";
 import { requireAdmin } from "../../request-utils.js";
@@ -10,6 +10,7 @@ import {
   proxiedPostImageUrl
 } from "../../content-utils.js";
 import { authorFromTopic, fallbackAuthor, normalizeNodebbUid, resolveAuthorsByNodebbUids } from "../../author-service.js";
+import { makePostRepository } from "../adapters/post-repository-adapter.js";
 import { makeNodebbGateways } from "../gateways/nodebb/index.js";
 import { makeAudiencePolicy } from "../policies/audience-policy.js";
 import { makeGetFeedUseCase } from "../usecases/feed/get-feed.js";
@@ -132,19 +133,6 @@ function toPostDetailDto(item = {}) {
     locationArea: String(item.locationArea || ""),
     sourceUrl: String(item.sourceUrl || ""),
     replies: posts.slice(1).map(toReplyDto)
-  };
-}
-
-function makePostRepository() {
-  return {
-    async getByTid(tid) {
-      const metadata = await loadMetadata();
-      return metadata[String(tid)] || {};
-    },
-    async listByTids(tids = []) {
-      const metadata = await loadMetadata();
-      return Object.fromEntries(tids.map((tid) => [String(tid), metadata[String(tid)] || {}]));
-    }
   };
 }
 
