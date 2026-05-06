@@ -10,6 +10,7 @@ import {
 } from "../../data-store.js";
 import { sendJson } from "../../http-response.js";
 import { buildChannelMessageHtml } from "../../post-html-service.js";
+import { buildActorSourcePair } from "../../post-actor-dto-service.js";
 import { readJsonBody } from "../../request-utils.js";
 import {
   ensureNodebbUid,
@@ -34,9 +35,24 @@ function parseLianUserMeta(html = "") {
   try { return JSON.parse(match[1]); } catch { return {}; }
 }
 
+function channelAuthorFromMeta(userMeta = {}, topic = {}, post = {}) {
+  const displayName = userMeta.displayName || userMeta.username || post.user?.username || topic.user?.username || "同学";
+  return {
+    displayName,
+    username: userMeta.username || post.user?.username || topic.user?.username || "",
+    avatarUrl: userMeta.avatarUrl || "",
+    avatarText: userMeta.avatarText || String(displayName || "同").slice(0, 1),
+    identityTag: userMeta.identityTag || "",
+    sourceProvider: "nodebb",
+    sourceVisible: false
+  };
+}
+
 function normalizeChannelEvent(topic = {}, post = {}, reads = {}) {
   const content = post.content || "";
   const userMeta = parseLianUserMeta(content);
+  const author = channelAuthorFromMeta(userMeta, topic, post);
+  const { actor, source } = buildActorSourcePair(author);
   const pid = Number(post.pid || 0);
   const tid = Number(topic.tid || post.tid || 0);
   const id = `${tid}:${pid || topic.timestamp || post.timestamp || "topic"}`;
@@ -47,11 +63,17 @@ function normalizeChannelEvent(topic = {}, post = {}, reads = {}) {
     title: topic.titleRaw || topic.title || "校园频道",
     contentHtml: content,
     text: stripHtml(content).trim(),
-    author: userMeta.displayName || userMeta.username || post.user?.username || topic.user?.username || "同学",
+    actor,
+    source,
+    author: actor.displayName,
+    username: actor.displayName,
     authorUserId: userMeta.userId || "",
-    authorIdentityTag: userMeta.identityTag || "",
-    authorAvatarText: userMeta.avatarText || String(userMeta.displayName || userMeta.username || "同").slice(0, 1),
-    authorAvatarUrl: userMeta.avatarUrl || "",
+    authorIdentityTag: actor.identityTag,
+    identityTag: actor.identityTag,
+    authorAvatarText: actor.avatarText,
+    avatarText: actor.avatarText,
+    authorAvatarUrl: actor.avatarUrl,
+    avatarUrl: actor.avatarUrl,
     authorAliasId: userMeta.aliasId || "",
     authorAliasName: userMeta.aliasName || "",
     authorActorSource: userMeta.actorSource || "",
