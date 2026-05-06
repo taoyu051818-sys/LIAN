@@ -3,6 +3,7 @@ import { getCurrentUser } from "./auth-service.js";
 import { loadMetadata, readJsonData, writeJsonFile } from "./data-store.js";
 import { sendJson } from "./http-response.js";
 import { locationsPath, mapV2LayersPath } from "./paths.js";
+import { buildPlaceRef, buildPlaceRefFromMetadata } from "./place-sheet-service.js";
 import { readJsonBody } from "./request-utils.js";
 
 const DEFAULT_CENTER = { lat: 18.3935, lng: 110.0159 };
@@ -91,6 +92,13 @@ function normalizeLocation(item = {}) {
     icon: normalizeIcon(item.icon),
     card: normalizeCard(item.card),
     status: item.status === "hidden" ? "hidden" : "active"
+  };
+}
+
+function toMapLocationDto(item = {}) {
+  return {
+    ...item,
+    place: buildPlaceRef(item)
   };
 }
 
@@ -309,6 +317,7 @@ function mapPostsFromMetadata(metadata = {}, locations = [], currentUser = null)
       ? { lat, lng }
       : (location ? { lat: location.lat, lng: location.lng } : null);
     if (!center) return null;
+    const place = buildPlaceRefFromMetadata(item, locations);
     return {
       tid: Number(tid),
       title: compactText(item.title || item.locationArea || location?.name || "校园记忆", 80),
@@ -316,6 +325,7 @@ function mapPostsFromMetadata(metadata = {}, locations = [], currentUser = null)
       locationArea: compactText(item.locationArea || location?.name || "", 80),
       lat: center.lat,
       lng: center.lng,
+      ...(place ? { place } : {}),
       imageUrl: Array.isArray(item.imageUrls) ? item.imageUrls[0] || "" : "",
       contentType: compactText(item.contentType || "general", 40)
     };
@@ -326,6 +336,7 @@ async function handleMapV2Items(req, res) {
   const { bounds, locations, layers } = await loadMapV2Data();
   const metadata = await loadMetadata();
   const auth = await getCurrentUser(req);
+  const activeLocations = locations.items.filter((item) => item.status === "active");
   return sendJson(res, 200, {
     ok: true,
     mapVersion: "gaode_v2",
@@ -333,7 +344,7 @@ async function handleMapV2Items(req, res) {
     bounds,
     center: layers.center.lat !== null && layers.center.lng !== null ? layers.center : DEFAULT_CENTER,
     zoom: layers.zoom,
-    locations: locations.items.filter((item) => item.status === "active"),
+    locations: activeLocations.map(toMapLocationDto),
     layers: {
       areas: layers.areas,
       routes: layers.routes,
@@ -344,7 +355,7 @@ async function handleMapV2Items(req, res) {
       buildingGroups: layers.buildingGroups,
       assets: (layers.assets || []).filter((a) => a.status === "active")
     },
-    posts: mapPostsFromMetadata(metadata, locations.items, auth.user)
+    posts: mapPostsFromMetadata(metadata, activeLocations, auth.user)
   });
 }
 
@@ -426,4 +437,12 @@ async function handleAdminMapV2(req, res) {
   return sendJson(res, 405, { error: "method not allowed" });
 }
 
-export { MAP_V2_BOUNDS, handleAdminMapV2, handleMapV2Items, loadMapV2Data };
+export {
+  MAP_V2_BOUNDS,
+  handleAdminMapV2,
+  handleMapV2Items,
+  loadMapV2Data,
+  mapPostsFromMetadata,
+  normalizeLocation,
+  toMapLocationDto
+};
