@@ -10,6 +10,7 @@ import {
   normalizePlaceType
 } from "../src/server/place-sheet-service.js";
 import { toPostDetailDto } from "../src/server/app/handlers/feed-handlers.js";
+import { mapPostsFromMetadata, toMapLocationDto } from "../src/server/map-v2-service.js";
 import { matchRoute } from "../src/server/route-matcher.js";
 
 let passed = 0;
@@ -123,6 +124,44 @@ test("PostDetailDto keeps manual locationArea as fallback without inferring plac
 });
 
 console.log("");
+console.log("▶ map place contract");
+test("map location marker exposes canonical place ref", () => {
+  const marker = toMapLocationDto(knownLocations[0]);
+  assert.equal(marker.id, "canteen");
+  assert.equal(marker.place.id, "canteen");
+  assert.equal(marker.place.name, "食堂");
+  assert.equal(marker.place.type, "merchant");
+});
+
+test("map post marker exposes place only when metadata has known place binding", () => {
+  const posts = mapPostsFromMetadata(
+    {
+      "100": {
+        title: "今天食堂二楼很好吃",
+        locationId: "canteen",
+        locationArea: "食堂",
+        visibility: "public"
+      },
+      "101": {
+        title: "手填地点但有坐标",
+        locationArea: "食堂",
+        lat: 18.3997424,
+        lng: 110.0244927,
+        visibility: "public"
+      }
+    },
+    knownLocations,
+    null
+  );
+  const known = posts.find((item) => item.tid === 100);
+  const manual = posts.find((item) => item.tid === 101);
+  assert.equal(known.place.id, "canteen");
+  assert.equal(known.locationArea, "食堂");
+  assert.equal(Object.prototype.hasOwnProperty.call(manual, "place"), false);
+  assert.equal(manual.locationArea, "食堂");
+});
+
+console.log("");
 console.log("▶ place sheet dto contract");
 test("PlaceSheetDto exposes place, server-owned status/source, stats, summary, and preview posts", () => {
   const sheet = buildPlaceSheetDto(
@@ -196,7 +235,7 @@ console.log("");
 console.log("═══ Result ═══");
 console.log(`Passed: ${passed}, Failed: ${failed}`);
 if (failed > 0) {
-  console.log("\nPlaceSheet contract failed. Keep #59 route, PlaceRefDto, PlaceSheetDto, detail place, and legacy location fallback semantics stable.");
+  console.log("\nPlaceSheet contract failed. Keep #59 route, PlaceRefDto, PlaceSheetDto, detail/map place, and legacy location fallback semantics stable.");
   process.exit(1);
 }
 
