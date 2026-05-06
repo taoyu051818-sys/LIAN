@@ -45,6 +45,17 @@ function buildPlaceRef(location = {}) {
   return Object.fromEntries(Object.entries(place).filter(([, value]) => value !== undefined && value !== ""));
 }
 
+function locationIdFromMetadata(metadata = {}) {
+  return compactText(metadata.locationId || metadata.placeId || "", 80);
+}
+
+function buildPlaceRefFromMetadata(metadata = {}, locations = []) {
+  const id = locationIdFromMetadata(metadata);
+  if (!id) return undefined;
+  const location = locations.find((item) => item.id === id && item.status === "active");
+  return location ? buildPlaceRef(location) : undefined;
+}
+
 function metadataMatchesPlace(metadata = {}, place = {}) {
   if (!metadata || typeof metadata !== "object") return false;
   if (metadata.locationId && metadata.locationId === place.id) return true;
@@ -151,9 +162,11 @@ async function handlePlaceSheet(req, placeId, res) {
 
 export {
   buildPlaceRef,
+  buildPlaceRefFromMetadata,
   buildPlaceSheetDto,
   getPlaceSheetById,
   handlePlaceSheet,
+  locationIdFromMetadata,
   normalizePlaceStatus,
   normalizePlaceType
 };
