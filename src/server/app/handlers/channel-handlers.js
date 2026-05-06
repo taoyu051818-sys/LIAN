@@ -2,22 +2,19 @@ import crypto from "node:crypto";
 
 import { config } from "../../config.js";
 import { memory } from "../../cache.js";
-import {
-  escapeHtml,
-  stripHtml
-} from "../../content-utils.js";
+import { stripHtml } from "../../content-utils.js";
 import {
   loadChannelReads,
   loadMetadata,
   saveChannelReadItems
 } from "../../data-store.js";
 import { sendJson } from "../../http-response.js";
+import { buildChannelMessageHtml } from "../../post-html-service.js";
 import { readJsonBody } from "../../request-utils.js";
 import {
   ensureNodebbUid,
   getCurrentUser,
-  requireUser,
-  selectIdentityTag
+  requireUser
 } from "../../auth-service.js";
 import { makeNodebbGateways } from "../gateways/nodebb/index.js";
 import { makeAudiencePolicy } from "../policies/audience-policy.js";
@@ -50,11 +47,14 @@ function normalizeChannelEvent(topic = {}, post = {}, reads = {}) {
     title: topic.titleRaw || topic.title || "校园频道",
     contentHtml: content,
     text: stripHtml(content).trim(),
-    author: userMeta.username || post.user?.username || topic.user?.username || "同学",
+    author: userMeta.displayName || userMeta.username || post.user?.username || topic.user?.username || "同学",
     authorUserId: userMeta.userId || "",
     authorIdentityTag: userMeta.identityTag || "",
-    authorAvatarText: userMeta.avatarText || String(userMeta.username || "同").slice(0, 1),
+    authorAvatarText: userMeta.avatarText || String(userMeta.displayName || userMeta.username || "同").slice(0, 1),
     authorAvatarUrl: userMeta.avatarUrl || "",
+    authorAliasId: userMeta.aliasId || "",
+    authorAliasName: userMeta.aliasName || "",
+    authorActorSource: userMeta.actorSource || "",
     timestampISO: post.timestampISO || topic.timestampISO || "",
     readCount: Array.isArray(reads.items?.[id]?.readers) ? reads.items[id].readers.length : 0,
     nodebbUrl: `${config.nodebbPublicBaseUrl}/post/${pid || tid}`
@@ -64,28 +64,6 @@ function normalizeChannelEvent(topic = {}, post = {}, reads = {}) {
 function clientReaderId(req, payload = {}) {
   const raw = payload.readerId || req.headers["x-client-id"] || req.headers["user-agent"] || "anonymous";
   return crypto.createHash("sha1").update(String(raw)).digest("hex").slice(0, 24);
-}
-
-function buildTextPostHtml(text = "") {
-  return String(text || "")
-    .split(/\n{2,}/)
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => `<p>${escapeHtml(part).replace(/\n/g, "<br>")}</p>`)
-    .join("\n");
-}
-
-function buildChannelMessageHtml(content, user, identityTag) {
-  const meta = {
-    userId: user.id,
-    nodebbUid: user.nodebbUid || null,
-    username: user.username,
-    identityTag: selectIdentityTag(user, identityTag),
-    avatarText: String(user.username || "同").slice(0, 1),
-    avatarUrl: user.avatarUrl || "",
-    sentAt: new Date().toISOString()
-  };
-  return `<!-- lian-channel-meta ${escapeHtml(JSON.stringify(meta))} -->\n${buildTextPostHtml(content)}`;
 }
 
 function jsonBearerHeaders() {
@@ -209,7 +187,7 @@ async function handleChannelMessageRefactored(req, res) {
 
     const payload = await readJsonBody(req).catch(() => ({}));
     const content = String(payload.content || "").trim();
-    const identityTag = selectIdentityTag(auth.user, String(payload.identityTag || ""));
+    const identityTag = String(payload.identityTag || "").trim();
     if (!content) return sendJson(res, 400, { error: "content is required" });
     if (content.length > 800) return sendJson(res, 400, { error: "content is too long" });
 
@@ -249,7 +227,6 @@ async function handleChannelMessageRefactored(req, res) {
 }
 
 export {
-  buildChannelMessageHtml,
   handleChannelMessageRefactored,
   handleChannelReadRefactored,
   handleChannelRefactored,
