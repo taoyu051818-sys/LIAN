@@ -1,4 +1,5 @@
 const BLOCKED_IDENTITY_TAGS = new Set(["nodebb", "system", "lian", "imported"]);
+const ALLOWED_SOURCE_PROVIDERS = new Set(["nodebb", "lian", "imported", "official"]);
 
 function initialsFromName(value = "") {
   return Array.from(String(value || "同学").trim()).slice(0, 2).join("").toUpperCase() || "同";
@@ -12,17 +13,16 @@ function normalizeIdentityTag(value = "") {
 
 function normalizeSourceProvider(value = "") {
   const provider = String(value || "").trim().toLowerCase();
-  if (["nodebb", "lian", "imported", "official"].includes(provider)) return provider;
-  return provider ? "imported" : "";
+  return ALLOWED_SOURCE_PROVIDERS.has(provider) ? provider : "";
 }
 
 function buildSourceSignal(author = {}, metadata = {}) {
-  const provider = normalizeSourceProvider(metadata.sourceProvider || author.source || "");
+  const provider = normalizeSourceProvider(metadata.sourceProvider || author.sourceProvider || "");
   if (!provider) return undefined;
   return {
     provider,
-    label: String(metadata.sourceLabel || "").trim(),
-    visible: Boolean(metadata.sourceVisible)
+    label: String(metadata.sourceLabel || author.sourceLabel || "").trim(),
+    visible: Boolean(metadata.sourceVisible || author.sourceVisible)
   };
 }
 
@@ -48,5 +48,6 @@ export {
   buildActorSourcePair,
   buildDisplayActorDto,
   buildSourceSignal,
-  normalizeIdentityTag
+  normalizeIdentityTag,
+  normalizeSourceProvider
 };
