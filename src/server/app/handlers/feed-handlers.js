@@ -11,6 +11,8 @@ import {
 } from "../../content-utils.js";
 import { authorFromTopic, fallbackAuthor, normalizeNodebbUid, resolveAuthorsByNodebbUids } from "../../author-service.js";
 import { buildActorSourcePair } from "../../post-actor-dto-service.js";
+import { buildPlaceRefFromMetadata } from "../../place-sheet-service.js";
+import { loadMapV2Data } from "../../map-v2-service.js";
 import { makePostRepository } from "../adapters/post-repository-adapter.js";
 import { makeNodebbGateways } from "../gateways/nodebb/index.js";
 import { makeAudiencePolicy } from "../policies/audience-policy.js";
@@ -124,11 +126,13 @@ function toReplyDto(post = {}) {
   };
 }
 
-function toPostDetailDto(item = {}) {
+function toPostDetailDto(item = {}, options = {}) {
   const posts = Array.isArray(item.topic?.posts) ? item.topic.posts : [];
   const imageUrls = Array.isArray(item.imageUrls) ? item.imageUrls : [];
   const author = item.author || fallbackAuthor();
-  const { actor, source } = buildActorSourcePair(author, item.metadata || {});
+  const metadata = item.metadata || {};
+  const { actor, source } = buildActorSourcePair(author, metadata);
+  const place = buildPlaceRefFromMetadata(metadata, options.locations || []);
   return {
     tid: Number(item.tid),
     title: String(item.title || "未命名"),
@@ -147,6 +151,7 @@ function toPostDetailDto(item = {}) {
     liked: Boolean(item.liked),
     bookmarked: Boolean(item.bookmarked),
     locationArea: String(item.locationArea || ""),
+    ...(place ? { place } : {}),
     sourceUrl: String(item.sourceUrl || ""),
     replies: posts.slice(1).map(toReplyDto)
   };
@@ -255,7 +260,8 @@ async function handlePostDetailRefactored(req, tid, res) {
       cache: makeFeedCache()
     }).execute({ actor: auth.user, tid, nodebbUid });
     const [resolved] = await applyAuthorDtos([detail], nodebb.users);
-    sendJson(res, 200, toPostDetailDto(resolved));
+    const { locations } = await loadMapV2Data();
+    sendJson(res, 200, toPostDetailDto(resolved, { locations: locations.items || [] }));
   } catch (error) {
     sendJson(res, error.status || 500, { error: error.message });
   }
@@ -265,5 +271,6 @@ export {
   handleFeedDebugRefactored,
   handleFeedRefactored,
   handlePostDetailRefactored,
-  normalizeTabs
+  normalizeTabs,
+  toPostDetailDto
 };
