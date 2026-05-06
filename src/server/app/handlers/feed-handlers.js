@@ -272,5 +272,6 @@ export {
   handleFeedRefactored,
   handlePostDetailRefactored,
   normalizeTabs,
+  toFeedItemDto,
   toPostDetailDto
 };
