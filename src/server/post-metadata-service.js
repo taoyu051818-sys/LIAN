@@ -1,4 +1,5 @@
 import { normalizeAudience } from "./audience-service.js";
+import { buildPlaceRefFromMetadata } from "./place-sheet-service.js";
 
 const AI_ALLOWED_CONTENT_TYPES = new Set([
   "campus_moment",
@@ -67,34 +68,70 @@ function metadataVisibilityFromAudience(audience = {}) {
   return audience.linkOnly ? "linkOnly" : (audience.visibility || "public");
 }
 
-function buildMapMetadataPatch(mapLocation = {}) {
-  if (!mapLocation || typeof mapLocation !== "object") return {};
-  const lat = Number(mapLocation.lat);
-  const lng = Number(mapLocation.lng);
+function normalizePublishLocationInput(locationInput = {}, mapLocation = {}) {
+  const location = locationInput && typeof locationInput === "object" ? locationInput : {};
+  const map = mapLocation && typeof mapLocation === "object" ? mapLocation : {};
+  const placeId = truncateMetadataText(location.placeId || location.locationId || location.id || map.placeId || map.locationId || map.id || "", 80);
+  const placeName = truncateMetadataText(location.placeName || location.name || location.locationArea || map.placeName || map.name || map.locationArea || "", 80);
+  const lat = Number(location.lat ?? map.lat);
+  const lng = Number(location.lng ?? map.lng);
+  const x = Number(location.x ?? map.x);
+  const y = Number(location.y ?? map.y);
   const hasLatLng = Number.isFinite(lat) && Number.isFinite(lng);
-  const x = Number(mapLocation.x);
-  const y = Number(mapLocation.y);
   const hasLegacyPoint = Number.isFinite(x) && Number.isFinite(y);
-  if (!hasLatLng && !hasLegacyPoint && !mapLocation.placeName) return {};
   return {
-    locationArea: String(mapLocation.placeName || "").trim(),
+    placeId,
+    placeName,
     lat: hasLatLng ? lat : undefined,
     lng: hasLatLng ? lng : undefined,
-    mapVersion: hasLatLng ? "gaode_v2" : "legacy",
+    x: hasLegacyPoint ? x : undefined,
+    y: hasLegacyPoint ? y : undefined,
+    hasLatLng,
+    hasLegacyPoint
+  };
+}
+
+function buildMapMetadataPatch(mapLocation = {}, locationInput = {}) {
+  const normalized = normalizePublishLocationInput(locationInput, mapLocation);
+  if (!normalized.hasLatLng && !normalized.hasLegacyPoint && !normalized.placeName && !normalized.placeId) return {};
+  const mapVersion = normalized.hasLatLng ? "gaode_v2" : "legacy";
+  return {
+    locationId: normalized.placeId,
+    locationArea: normalized.placeName,
+    lat: normalized.hasLatLng ? normalized.lat : undefined,
+    lng: normalized.hasLatLng ? normalized.lng : undefined,
+    mapVersion,
     locationDraft: {
-      source: hasLatLng ? "map_v2" : "legacy_map",
-      locationId: "",
-      locationArea: String(mapLocation.placeName || "").trim(),
-      displayName: String(mapLocation.placeName || "").trim(),
-      lat: hasLatLng ? lat : null,
-      lng: hasLatLng ? lng : null,
-      legacyPoint: { x: hasLegacyPoint ? x : null, y: hasLegacyPoint ? y : null },
-      imagePoint: { x: hasLegacyPoint ? x : null, y: hasLegacyPoint ? y : null },
-      mapVersion: hasLatLng ? "gaode_v2" : "legacy",
-      confidence: hasLatLng ? 0.72 : (hasLegacyPoint ? 0.65 : 0.4),
+      source: normalized.hasLatLng ? "map_v2" : (normalized.placeId ? "place_binding" : "legacy_map"),
+      locationId: normalized.placeId,
+      locationArea: normalized.placeName,
+      displayName: normalized.placeName,
+      lat: normalized.hasLatLng ? normalized.lat : null,
+      lng: normalized.hasLatLng ? normalized.lng : null,
+      legacyPoint: { x: normalized.hasLegacyPoint ? normalized.x : null, y: normalized.hasLegacyPoint ? normalized.y : null },
+      imagePoint: { x: normalized.hasLegacyPoint ? normalized.x : null, y: normalized.hasLegacyPoint ? normalized.y : null },
+      mapVersion,
+      confidence: normalized.placeId ? 0.9 : (normalized.hasLatLng ? 0.72 : (normalized.hasLegacyPoint ? 0.65 : 0.4)),
       skipped: false,
       note: ""
     }
+  };
+}
+
+function buildPublishLocationResult(metadata = {}, locations = []) {
+  const place = buildPlaceRefFromMetadata(metadata, locations);
+  const locationArea = truncateMetadataText(metadata.locationArea || "", 80);
+  return {
+    ...(locationArea ? { locationArea } : {}),
+    ...(place ? { place } : {})
+  };
+}
+
+function buildPublishResponseDto(topic = {}, metadata = {}, locations = []) {
+  const base = topic && typeof topic === "object" && !Array.isArray(topic) ? topic : { topic };
+  return {
+    ...base,
+    ...buildPublishLocationResult(metadata, locations)
   };
 }
 
@@ -115,7 +152,7 @@ function normalizeAiPublishMetadata(value = {}, locationDraft = {}, request = {}
     contentType,
     vibeTags: normalizeMetadataHashtags(input.vibeTags, 5),
     sceneTags: normalizeMetadataHashtags(input.sceneTags, 5),
-    locationId: "",
+    locationId: truncateMetadataText(locationDraft.locationId || input.locationId || input.placeId || "", 80),
     locationArea,
     qualityScore: clampMetadataNumber(input.qualityScore),
     imageImpactScore: clampMetadataNumber(input.imageImpactScore),
@@ -141,7 +178,10 @@ export {
   AI_ALLOWED_VISIBILITY,
   AI_DEFAULT_METADATA,
   buildMapMetadataPatch,
+  buildPublishLocationResult,
+  buildPublishResponseDto,
   metadataArray,
   metadataVisibilityFromAudience,
-  normalizeAiPublishMetadata
+  normalizeAiPublishMetadata,
+  normalizePublishLocationInput
 };

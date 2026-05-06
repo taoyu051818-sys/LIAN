@@ -21,11 +21,13 @@ import {
 } from "../../post-html-service.js";
 import {
   buildMapMetadataPatch,
+  buildPublishResponseDto,
   metadataVisibilityFromAudience
 } from "../../post-metadata-service.js";
 import { readJsonBody } from "../../request-utils.js";
 import { ensureNodebbUid, requireUser } from "../../auth-service.js";
 import { findUserAlias } from "../../alias-service.js";
+import { loadMapV2Data } from "../../map-v2-service.js";
 import { makeCacheAdapter } from "../adapters/cache-adapter.js";
 import { makeNodebbDeps } from "../adapters/nodebb-deps-adapter.js";
 import { makePostRepository } from "../adapters/post-repository-adapter.js";
@@ -150,6 +152,13 @@ async function handleCreatePostRefactored(req, res) {
     });
     const tags = Array.isArray(payload.tags) && payload.tags.length ? payload.tags : (payload.tag ? [payload.tag] : []);
     const deps = makeCommonDeps();
+    const metadata = {
+      title,
+      imageUrls,
+      visibility,
+      audience,
+      ...buildMapMetadataPatch(payload.mapLocation, payload.location)
+    };
     const result = await makeCreatePostUseCase({
       nodebbTopics: deps.nodebb.topics,
       publishPolicy: deps.publishPolicy,
@@ -166,17 +175,12 @@ async function handleCreatePostRefactored(req, res) {
         cid: Number(payload.cid || config.nodebbCid),
         tags,
         audience,
-        metadata: {
-          title,
-          imageUrls,
-          visibility,
-          audience,
-          ...buildMapMetadataPatch(payload.mapLocation)
-        }
+        metadata
       }
     });
     if (imageUrls.length) await warmupPostImages(imageUrls);
-    sendJson(res, 200, result.topic);
+    const { locations } = await loadMapV2Data();
+    sendJson(res, 200, buildPublishResponseDto(result.topic, result.metadata || metadata, locations.items || []));
   } catch (error) {
     sendJson(res, error.status || 500, { error: error.message });
   }
