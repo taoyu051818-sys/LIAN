@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LIAN Batch Task",
+  "description": "Schema for a single task entry in a batch-launch task file.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["name", "wt", "branch", "prompt"],
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "Unique task identifier, e.g. F2-external-asset-inventory."
+      },
+      "wt": {
+        "type": "string",
+        "description": "Worktree directory name under the worktree root."
+      },
+      "branch": {
+        "type": "string",
+        "description": "Git branch name for this task's worktree."
+      },
+      "prompt": {
+        "type": "string",
+        "description": "Task prompt text passed to Claude Code via stdin."
+      },
+      "type": {
+        "type": "string",
+        "enum": ["docs", "code", "infra", "review", "planner", "unspecified"],
+        "default": "unspecified",
+        "description": "Task type. Controls boundary rules and PR expectations."
+      },
+      "risk": {
+        "type": "string",
+        "enum": ["low", "medium", "high", "unspecified"],
+        "default": "unspecified",
+        "description": "Risk level for the task."
+      },
+      "conflictGroup": {
+        "type": "string",
+        "default": "unspecified",
+        "description": "Conflict group name. Tasks in the same group must not run in parallel unless the group is docs/review/planning."
+      },
+      "targetIssue": {
+        "type": "string",
+        "default": "",
+        "description": "Primary GitHub issue number this task targets."
+      },
+      "targetPr": {
+        "type": "string",
+        "default": "",
+        "description": "Existing PR number this task updates."
+      },
+      "issues": {
+        "type": "array",
+        "items": { "type": "string" },
+        "default": [],
+        "description": "Related issue numbers."
+      },
+      "allowedFiles": {
+        "type": "array",
+        "items": { "type": "string" },
+        "default": [],
+        "description": "File patterns the task may modify. Supports exact paths, dir/**, and glob-like *. Empty means unrestricted."
+      },
+      "forbiddenFiles": {
+        "type": "array",
+        "items": { "type": "string" },
+        "default": [],
+        "description": "File patterns the task must never modify. Overrides allowedFiles."
+      },
+      "validation": {
+        "type": "array",
+        "items": { "type": "string" },
+        "default": [],
+        "description": "Validation commands to run after task completion."
+      },
+      "reviewer": {
+        "type": "string",
+        "default": "",
+        "description": "Reviewer agent or user assigned to accept this task."
+      },
+      "acceptanceGate": {
+        "type": "string",
+        "default": "",
+        "description": "Acceptance criteria or gate description."
+      },
+      "followUpPolicy": {
+        "type": "string",
+        "enum": ["none", "serial-aggregator", "manual"],
+        "default": "none",
+        "description": "What happens after this task passes audit. serial-aggregator triggers a follow-up worker."
+      }
+    },
+    "additionalProperties": false
+  }
+}
