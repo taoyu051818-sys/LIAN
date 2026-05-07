@@ -1,0 +1,8 @@
+[
+  {
+    "name": "A4-fix-ops-guard",
+    "wt": "A4-runtime-preflight-no-install",
+    "branch": "cc/infra/A4-runtime-preflight-no-install",
+    "prompt": "Fix PR #170 only. Code/infra task. Read PR #170, failing Frontend Verify logs, issues #134 #125, scripts/serve-frontend-runtimes.js, and the ops guard inventory/docs referenced by npm run ops:guard. Do not change runtime behavior beyond what is needed to satisfy the guard. Run npm run check, npm run ops:guard, npm run build, and npm run verify if applicable. If ops:guard fails, fix the required inventory/docs update before committing. Commit, push, update existing PR #170. Do not add Claude branding footer. Final output must include PR URL."
+  }
+]

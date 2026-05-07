@@ -1,0 +1,32 @@
+[
+  {
+    "name": "F2-external-asset-inventory",
+    "wt": "F2-external-asset-inventory",
+    "branch": "cc/map/F2-external-asset-inventory",
+    "prompt": "Create docs/frontend/external-assets.md. Docs-only. Read issues #152 #112 #125 #134 using gh plus index.html and src/views/MapLeafletView.vue. Register Leaflet CDN, Gaode tiles, image proxy, API origins, URL/origin, purpose, version, SRI, owner, upgrade process, CSP directive, cache/offline policy. Do not migrate Leaflet to npm. Do not change CSP headers. Run npm run check. Commit, push, open or update PR. Do not use Closes unless the issue is documentation-only. Do not add Claude branding footer. Final output must include PR URL."
+  },
+  {
+    "name": "G9-moderation-visibility-contract",
+    "wt": "G9-moderation-visibility",
+    "branch": "cc/docs/G9-moderation-visibility-share-contract",
+    "prompt": "Create docs/frontend/moderation-visibility-contract.md. Docs-only. Read issues #129 #131 #140 using gh plus src/views/PublishView.vue and src/views/detail/PostDetailPanel.vue. Define reporting, hiding, blocking, delete/withdraw/edit boundaries; visibility public/campus/school/private user explanations, post-publish display, sharing strategy; and social preview privacy for restricted content. Do not implement UI. Run npm run check. Commit, push, open or update PR. Do not use Closes unless the issue is documentation-only. Do not add Claude branding footer. Final output must include PR URL."
+  },
+  {
+    "name": "G11-invite-contract",
+    "wt": "G11-invite-contract",
+    "branch": "cc/docs/G11-invite-contract",
+    "prompt": "Create docs/frontend/invite-contract.md. Docs-only. Read issues #142 #127 #140 using gh plus src/views/auth/AuthPanel.vue, src/views/profile/ProfileEditorPanel.vue, and src/api/profile.ts. Define InviteCode model status/expiresAt/usesRemaining/createdAt/scope, registration error classes and anti-enumeration copy, generation quota/cooldown/429, inviter/invitee visibility. Do not implement API. Run npm run check. Commit, push, open or update PR. Do not use Closes unless the issue is documentation-only. Do not add Claude branding footer. Final output must include PR URL."
+  },
+  {
+    "name": "G13-acceptance-checklist-refresh",
+    "wt": "G13-acceptance-checklist-refresh",
+    "branch": "cc/docs/G13-acceptance-checklist-refresh",
+    "prompt": "Update docs/agent/references/E2E_ACCEPTANCE_ACTOR_PLACESHEET_2026-05-06.md. Docs-only. Read issues #67 #63 #145 #146 #137 using gh. Refresh the actor/source/PlaceSheet acceptance checklist for actor presenter, ID, and PlaceSheet status contract. Preserve #67 as runtime/manual evidence gate. Add release id/build sha/environment/API version evidence fields. Distinguish required acceptance from later enhancements. Do not modify business code. Run npm run check. Commit, push, open or update PR. Do not use Closes unless the issue is documentation-only. Do not add Claude branding footer. Final output must include PR URL."
+  },
+  {
+    "name": "G14-motion-governance-refresh",
+    "wt": "G14-motion-governance",
+    "branch": "cc/docs/G14-motion-governance-refresh",
+    "prompt": "Create or update docs/frontend/motion-governance.md. Docs-only. Read issues #85 #86 #91 using gh plus src/styles/floating-chrome.css, src/views/FeedView.vue, and src/views/detail/PostDetailPanel.vue. Update current motion governance state, whether directional chrome motion continues or no-motion contract is accepted, mark whether v1 overlay is scaffolding, define motion PR review gates, and list deferred motion work. Do not change motion code. Run npm run check. Commit, push, open or update PR. Do not use Closes unless the issue is documentation-only. Do not add Claude branding footer. Final output must include PR URL."
+  }
+]

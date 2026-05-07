@@ -12,7 +12,7 @@ This document is generated from executable project state so operational docs do 
 | --- | --- |
 | npm run audit:feed-images | node scripts/audit-feed-image-coverage.js |
 | npm run audit:feed-images:strict | node scripts/audit-feed-image-coverage.js --min-coverage=0.8 |
-| npm run check | node scripts/validate-backend-structure.js && node scripts/check-encoding-contamination.js && node scripts/check-code-smells.js && node scripts/check-context-docs.js && node scripts/check-docs-maintenance.js && npm run docs:check-generated && node scripts/test-route-registry.js && node scripts/test-actor-source-contracts.js |
+| npm run check | node scripts/validate-backend-structure.js && node scripts/check-encoding-contamination.js && node scripts/check-code-smells.js && node scripts/check-context-docs.js && node scripts/check-docs-maintenance.js && npm run docs:check-generated && node scripts/test-route-registry.js && node scripts/test-actor-source-contracts.js && node scripts/test-place-sheet-contract.js && node scripts/test-place-ref-stable-id-contract.js |
 | npm run check:backend | node scripts/validate-backend-structure.js |
 | npm run check:context | node scripts/check-context-docs.js |
 | npm run check:docs | node scripts/check-docs-maintenance.js |
@@ -26,6 +26,8 @@ This document is generated from executable project state so operational docs do 
 | npm run test:nodebb-boundary | node scripts/test-nodebb-boundary.js |
 | npm run test:object-native | node scripts/test-object-native-runtime.js |
 | npm run test:ops-actions | node scripts/test-ops-actions.js |
+| npm run test:place-ref-stable-id-contract | node scripts/test-place-ref-stable-id-contract.js |
+| npm run test:place-sheet-contract | node scripts/test-place-sheet-contract.js |
 | npm run test:public-entry-checks | node scripts/test-public-entry-checks.js |
 | npm run test:route-manifest | node scripts/test-route-manifest.js |
 | npm run test:route-registry | node scripts/test-route-registry.js |
@@ -100,6 +102,7 @@ This document is generated from executable project state so operational docs do 
 
 | method | pattern | route id | params |
 | --- | --- | --- | --- |
+| GET | /^\/api\/place-sheets\/([A-Za-z0-9._~-]+)$/ | place-sheet | placeId |
 | GET | /^\/api\/posts\/(\d+)$/ | post-detail | tid |
 | POST | /^\/api\/posts\/(\d+)\/replies$/ | post-replies | tid |
 | POST | /^\/api\/posts\/(\d+)\/like$/ | post-like | tid |
@@ -120,6 +123,6 @@ This document is generated from executable project state so operational docs do 
 ## Maintenance contract
 
 - Update source registries first, not this file.
-- Run `npm run docs:generate` after changing route, public entry, workflow, or verification script facts.
-- CI should run `npm run docs:check-generated` to block stale generated documentation.
+- `npm run docs:check-generated` regenerates this file when it drifts and reports a warning instead of blocking CI.
+- Review generated diffs when they matter, but do not hand-edit this file.
 
