@@ -9,14 +9,12 @@ param(
 $ErrorActionPreference = 'Continue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-$prompt = Get-Content -LiteralPath $PromptPath -Raw
-$systemPrompt = Get-Content -LiteralPath $SystemPromptPath -Raw
-
 "[START] $(Get-Date -Format o)" | Set-Content -LiteralPath $StdoutPath -Encoding UTF8
 "workdir=$(Get-Location)" | Add-Content -LiteralPath $StdoutPath -Encoding UTF8
 "branch=$(git branch --show-current)" | Add-Content -LiteralPath $StdoutPath -Encoding UTF8
 
-$output = & $Exe --print --permission-mode bypassPermissions --append-system-prompt $systemPrompt $prompt 2>&1
+$output = Get-Content -LiteralPath $PromptPath -Raw |
+  & $Exe --print --permission-mode bypassPermissions --append-system-prompt-file $SystemPromptPath 2>&1
 $exitCode = $LASTEXITCODE
 if ($output) {
   $output | Out-File -LiteralPath $StdoutPath -Append -Encoding UTF8
